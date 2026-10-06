@@ -47,3 +47,9 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# .NET build outputs and private local operator data
+**/bin/
+**/obj/
+**/dotnet/publish/
+.data/
