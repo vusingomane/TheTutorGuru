@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API for TheTutorGuru online high-school tutoring platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: tutoring
+    description: Subjects, enrolments, live sessions, materials, and learner progress
+  - name: storage
+    description: Private file uploads and playback
 paths:
   /healthz:
     get:
@@ -24,6 +28,387 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /subjects:
+    get:
+      operationId: listSubjects
+      tags: [tutoring]
+      summary: List available tutoring subjects
+      responses:
+        "200":
+          description: Subjects available for subscription
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subject"
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [tutoring]
+      summary: Get the signed-in user's tutoring profile
+      responses:
+        "200":
+          description: Current profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "404":
+          description: Profile setup is required
+    put:
+      operationId: saveProfile
+      tags: [tutoring]
+      summary: Create or update the signed-in user's tutoring profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+      responses:
+        "200":
+          description: Saved profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+  /overview:
+    get:
+      operationId: getOverview
+      tags: [tutoring]
+      summary: Get a role-specific dashboard summary
+      responses:
+        "200":
+          description: Dashboard totals and recent activity for the current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Overview"
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [tutoring]
+      summary: List courses visible to the signed-in user
+      parameters:
+        - name: subjectId
+          in: query
+          schema:
+            type: string
+        - name: grade
+          in: query
+          schema:
+            type: integer
+            minimum: 8
+            maximum: 12
+      responses:
+        "200":
+          description: Available and enrolled courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+  /enrollments:
+    get:
+      operationId: listEnrollments
+      tags: [tutoring]
+      summary: List the current parent's subscriptions or learner enrolments
+      responses:
+        "200":
+          description: Enrolments for the signed-in user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Enrollment"
+    post:
+      operationId: createEnrollment
+      tags: [tutoring]
+      summary: Start a subject subscription for a learner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollmentInput"
+      responses:
+        "201":
+          description: Subscription created and awaiting payment-provider checkout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment"
+  /enrollments/{enrollmentId}:
+    patch:
+      operationId: updateEnrollment
+      tags: [tutoring]
+      summary: Cancel a subscription or change its subject selection
+      parameters:
+        - name: enrollmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollmentUpdate"
+      responses:
+        "200":
+          description: Updated subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Enrollment"
+        "404":
+          description: Subscription not found
+  /learners:
+    get:
+      operationId: listLearners
+      tags: [tutoring]
+      summary: List learners linked to the current parent or tutor
+      responses:
+        "200":
+          description: Learner roster
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Learner"
+    post:
+      operationId: createLearner
+      tags: [tutoring]
+      summary: Add a learner to the current parent's account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LearnerInput"
+      responses:
+        "201":
+          description: Learner profile created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Learner"
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [tutoring]
+      summary: List live classes and recordings for the signed-in user
+      parameters:
+        - name: courseId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scheduled and completed classes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClassSession"
+    post:
+      operationId: createSession
+      tags: [tutoring]
+      summary: Schedule a live class for a tutor's course
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Class session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassSession"
+  /sessions/{sessionId}:
+    patch:
+      operationId: updateSession
+      tags: [tutoring]
+      summary: Update a tutor's class session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionUpdate"
+      responses:
+        "200":
+          description: Updated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassSession"
+        "404":
+          description: Session not found
+  /materials:
+    get:
+      operationId: listMaterials
+      tags: [tutoring]
+      summary: List notes and learning resources available to the signed-in user
+      parameters:
+        - name: courseId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Course materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Material"
+    post:
+      operationId: createMaterial
+      tags: [tutoring]
+      summary: Add uploaded notes to a tutor's course
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaterialInput"
+      responses:
+        "201":
+          description: Material saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Material"
+  /materials/{materialId}:
+    delete:
+      operationId: deleteMaterial
+      tags: [tutoring]
+      summary: Remove a tutor's course material
+      parameters:
+        - name: materialId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Material removed
+        "404":
+          description: Material not found
+  /recordings:
+    get:
+      operationId: listRecordings
+      tags: [tutoring]
+      summary: List class recordings available to the signed-in user
+      responses:
+        "200":
+          description: Class recordings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Recording"
+    post:
+      operationId: createRecording
+      tags: [tutoring]
+      summary: Attach an uploaded class recording to a completed session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordingInput"
+      responses:
+        "201":
+          description: Recording saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recording"
+  /progress:
+    get:
+      operationId: listProgress
+      tags: [tutoring]
+      summary: View learner attendance and progress reports
+      parameters:
+        - name: learnerId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Progress by learner and subject
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProgressReport"
+  /attendance/{sessionId}/{learnerId}:
+    put:
+      operationId: markAttendance
+      tags: [tutoring]
+      summary: Mark learner attendance for a tutor's session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: learnerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendanceInput"
+      responses:
+        "200":
+          description: Attendance saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attendance"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a private upload URL for course notes or recordings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadRequest"
+      responses:
+        "200":
+          description: Temporary URL and private object path
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrl"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +418,227 @@ components:
           type: string
       required:
         - status
+    Subject:
+      type: object
+      required: [id, name, grades, priceMonthlyZar]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        grades:
+          type: array
+          items: { type: integer }
+        priceMonthlyZar: { type: integer }
+        description: { type: string }
+    Profile:
+      type: object
+      required: [id, fullName, email, role, createdAt]
+      properties:
+        id: { type: string }
+        fullName: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [parent, learner, tutor] }
+        phone: { type: ["string", "null"] }
+        grade: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    ProfileInput:
+      type: object
+      required: [fullName, role]
+      properties:
+        fullName: { type: string, minLength: 2 }
+        role: { type: string, enum: [parent, learner, tutor] }
+        phone: { type: ["string", "null"] }
+        grade: { type: ["integer", "null"], minimum: 8, maximum: 12 }
+    Overview:
+      type: object
+      required: [role, upcomingSessions, activeSubjects, totalLearners, recentActivity]
+      properties:
+        role: { type: string, enum: [parent, learner, tutor] }
+        upcomingSessions: { type: integer }
+        activeSubjects: { type: integer }
+        totalLearners: { type: integer }
+        recentActivity:
+          type: array
+          items: { $ref: "#/components/schemas/ActivityItem" }
+    ActivityItem:
+      type: object
+      required: [id, title, detail, createdAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        createdAt: { type: string, format: date-time }
+    Course:
+      type: object
+      required: [id, subjectId, subjectName, title, gradeMin, gradeMax, tutorName]
+      properties:
+        id: { type: string }
+        subjectId: { type: string }
+        subjectName: { type: string }
+        title: { type: string }
+        gradeMin: { type: integer }
+        gradeMax: { type: integer }
+        tutorName: { type: string }
+        scheduleSummary: { type: ["string", "null"] }
+    Learner:
+      type: object
+      required: [id, name, grade, email, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        grade: { type: integer, minimum: 8, maximum: 12 }
+        email: { type: string, format: email }
+        createdAt: { type: string, format: date-time }
+    LearnerInput:
+      type: object
+      required: [name, grade, email]
+      properties:
+        name: { type: string, minLength: 2 }
+        grade: { type: integer, minimum: 8, maximum: 12 }
+        email: { type: string, format: email }
+    Enrollment:
+      type: object
+      required: [id, learnerId, learnerName, learnerGrade, subjectIds, monthlyAmountZar, status, paymentStatus, createdAt]
+      properties:
+        id: { type: string }
+        learnerId: { type: ["string", "null"] }
+        learnerName: { type: string }
+        learnerGrade: { type: integer }
+        subjectIds:
+          type: array
+          items: { type: string }
+        monthlyAmountZar: { type: integer }
+        status: { type: string, enum: [pending, active, cancelling, cancelled] }
+        paymentStatus: { type: string, enum: [awaiting_provider, paid, failed] }
+        periodEndsAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    EnrollmentInput:
+      type: object
+      required: [learnerId, subjectIds]
+      properties:
+        learnerId: { type: string }
+        subjectIds:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items: { type: string }
+    EnrollmentUpdate:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [cancel, resume] }
+    ClassSession:
+      type: object
+      required: [id, courseId, courseTitle, subjectName, title, startsAt, durationMinutes, status, tutorName]
+      properties:
+        id: { type: string }
+        courseId: { type: string }
+        courseTitle: { type: string }
+        subjectName: { type: string }
+        title: { type: string }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer }
+        status: { type: string, enum: [scheduled, live, completed, cancelled] }
+        meetingUrl: { type: ["string", "null"], format: uri }
+        tutorName: { type: string }
+        attendanceCount: { type: integer }
+    SessionInput:
+      type: object
+      required: [courseId, title, startsAt, durationMinutes]
+      properties:
+        courseId: { type: string }
+        title: { type: string, minLength: 2 }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 15, maximum: 180 }
+        meetingUrl: { type: ["string", "null"], format: uri }
+    SessionUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 2 }
+        startsAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 15, maximum: 180 }
+        status: { type: string, enum: [scheduled, live, completed, cancelled] }
+        meetingUrl: { type: ["string", "null"], format: uri }
+    Material:
+      type: object
+      required: [id, courseId, courseTitle, title, originalFileName, objectPath, contentType, sizeBytes, uploadedAt]
+      properties:
+        id: { type: string }
+        courseId: { type: string }
+        courseTitle: { type: string }
+        title: { type: string }
+        originalFileName: { type: string }
+        objectPath: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer }
+        uploadedAt: { type: string, format: date-time }
+    MaterialInput:
+      type: object
+      required: [courseId, title, originalFileName, objectPath, contentType, sizeBytes]
+      properties:
+        courseId: { type: string }
+        title: { type: string, minLength: 2 }
+        originalFileName: { type: string, minLength: 1, maxLength: 255 }
+        objectPath: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer, minimum: 1 }
+    Recording:
+      type: object
+      required: [id, sessionId, sessionTitle, courseTitle, title, objectPath, durationSeconds, uploadedAt]
+      properties:
+        id: { type: string }
+        sessionId: { type: string }
+        sessionTitle: { type: string }
+        courseTitle: { type: string }
+        title: { type: string }
+        objectPath: { type: string }
+        durationSeconds: { type: integer }
+        uploadedAt: { type: string, format: date-time }
+    RecordingInput:
+      type: object
+      required: [sessionId, title, objectPath, durationSeconds]
+      properties:
+        sessionId: { type: string }
+        title: { type: string, minLength: 2 }
+        objectPath: { type: string }
+        durationSeconds: { type: integer, minimum: 1 }
+    ProgressReport:
+      type: object
+      required: [learnerId, learnerName, grade, subjectId, subjectName, classesAttended, classesTotal, attendancePercent, updatedAt]
+      properties:
+        learnerId: { type: string }
+        learnerName: { type: string }
+        grade: { type: integer }
+        subjectId: { type: string }
+        subjectName: { type: string }
+        classesAttended: { type: integer }
+        classesTotal: { type: integer }
+        attendancePercent: { type: integer }
+        averageScore: { type: ["number", "null"] }
+        updatedAt: { type: string, format: date-time }
+    Attendance:
+      type: object
+      required: [sessionId, learnerId, attended, markedAt]
+      properties:
+        sessionId: { type: string }
+        learnerId: { type: string }
+        attended: { type: boolean }
+        markedAt: { type: string, format: date-time }
+    AttendanceInput:
+      type: object
+      required: [attended]
+      properties:
+        attended: { type: boolean }
+    UploadRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string }
+        size: { type: integer, minimum: 1}
+        contentType: { type: string }
+    UploadUrl:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string, format: uri }
+        objectPath: { type: string }
 
