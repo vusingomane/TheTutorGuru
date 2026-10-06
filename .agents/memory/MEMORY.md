@@ -1,1 +1,3 @@
 - [Source product requirements](source-product-requirements.md) — subject eligibility, pricing, class frequency, refund policy, and the requested architecture from the build brief.
+- [Sidecar date serialization](sidecar-date-serialization.md) — storage signing expiry must use UTC Z; escaped plus-offset timestamps yield empty HTTP 400 responses.
+- [Playback test codecs](playback-test-codecs.md) — testing Chromium lacks H.264; use VP9 MP4 for positive playback and distinguish codec support from corrupt delivery.

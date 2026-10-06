@@ -1,0 +1,89 @@
+@page "/subscriptions"
+@inherits GuruPage
+
+<Frame Title="Subscriptions" Subtitle="R290 per month for one subject, R495 for two. Full refund within 30 days." Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    <MudAlert Severity="Severity.Info" Class="mb-4">Payments are not enabled yet. A new subscription stays pending and grants no class content until payment is confirmed.</MudAlert>
+    @if (!IsParent) { <Empty Icon="@Icons.Material.Filled.Lock" Title="Parents manage subscriptions" Text="Ask your parent to subscribe on your behalf." /> }
+    else
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-6" Style="border:1px solid #ddd3bd">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editing == null ? "New subscription" : "Change subjects")</MudText>
+            @if (_editing == null)
+            {
+                <MudSelect T="string" @bind-Value="_learner" Label="Learner" Variant="Variant.Outlined" Class="mb-3">@foreach (var l in _learners) { <MudSelectItem T="string" Value="@l.S("id")">@l.S("name") (Grade @l.I("grade"))</MudSelectItem> }</MudSelect>
+            }
+            <MudText Typo="Typo.body2">Pick one or two subjects.</MudText>
+            @foreach (var s in EligibleSubjects())
+            {
+                var id = s.S("id");
+                <MudCheckBox T="bool" Value="_picked.Contains(id)" ValueChanged="v => Toggle(id, v)" Color="Color.Primary" Label="@($"{s.S("name")} (grades {Home.GradeRange(s)})")" />
+            }
+            <MudText Typo="Typo.h6" Class="my-2">Total: R@(_picked.Count == 2 ? 495 : _picked.Count == 1 ? 290 : 0) per month</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_busy">@(_editing == null ? "Create pending subscription" : "Save change")</MudButton>
+            @if (_editing != null) { <MudButton Class="ml-2" OnClick="CancelEdit">Discard</MudButton> }
+        </MudPaper>
+    }
+    <MudText Typo="Typo.h5" Class="mb-2">@(IsParent ? "Your subscriptions" : "Subscriptions")</MudText>
+    @if (_subs.Count == 0) { <Empty Icon="@Icons.Material.Filled.CreditCard" Title="No subscriptions" Text="Create one above to get started." /> }
+    else
+    {
+        @foreach (var e in _subs)
+        {
+            var st = e.S("status");
+            <MudPaper Elevation="0" Class="pa-4 mb-3" Style="border:1px solid #ddd3bd">
+                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                    <div>
+                        <MudText Typo="Typo.subtitle1">@e.S("learnerName") (Grade @e.I("learnerGrade"))</MudText>
+                        <MudText Typo="Typo.body2">@string.Join(", ", e.L("subjectIds").Select(i => SubjectName(i.ToString()))) &middot; R@(e.I("monthlyAmountZar")) per month</MudText>
+                        <MudStack Row Spacing="1" Class="mt-1">
+                            <MudChip T="string" Size="Size.Small" Color="@StatusColor(st)">@st</MudChip>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">payment: @e.S("paymentStatus").Replace('_', ' ')</MudChip>
+                        </MudStack>
+                    </div>
+                    @if (IsParent)
+                    {
+                        <MudStack Row Spacing="1">
+                            @if (st != "cancelled" && st != "cancelling") { <MudButton Variant="Variant.Outlined" OnClick="() => StartEdit(e)">Change subjects</MudButton> <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick='() => Act(e, "cancel")'>Cancel</MudButton> }
+                            @if (st == "cancelling") { <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick='() => Act(e, "resume")'>Resume</MudButton> }
+                        </MudStack>
+                    }
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</Frame>
+
+@code {
+    List<JsonNode> _subs = new(), _learners = new(), _subjects = new(); HashSet<string> _picked = new(); string _learner = ""; JsonNode? _editing; bool _busy;
+    Color StatusColor(string s) => s switch { "active" => Color.Success, "pending" => Color.Warning, "cancelling" => Color.Tertiary, _ => Color.Default };
+    string SubjectName(string id) => _subjects.FirstOrDefault(s => s.S("id") == id)?.S("name") ?? id;
+    protected override async Task Load()
+    {
+        _subjects = (await Api.Send("/subjects")).L(); _subs = (await Api.Send("/enrollments")).L();
+        if (IsParent) _learners = (await Api.Send("/learners")).L();
+    }
+    IEnumerable<JsonNode> EligibleSubjects()
+    {
+        var gradeStr = _editing != null ? _editing.I("learnerGrade") : _learners.FirstOrDefault(l => l.S("id") == _learner)?.I("grade") ?? 0;
+        return _subjects.Where(s => gradeStr == 0 || s.L("grades").Any(g => g.GetValue<int>() == gradeStr));
+    }
+    void Toggle(string id, bool on) { if (on) { if (_picked.Count >= 2) { Snack.Add("A subscription covers at most two subjects.", Severity.Warning); return; } _picked.Add(id); } else _picked.Remove(id); }
+    void StartEdit(JsonNode e) { _editing = e; _picked = e.L("subjectIds").Select(x => x.ToString()).ToHashSet(); }
+    void CancelEdit() { _editing = null; _picked.Clear(); }
+    async Task Save()
+    {
+        if (_picked.Count == 0) { Snack.Add("Choose at least one subject.", Severity.Warning); return; }
+        if (_editing == null && string.IsNullOrEmpty(_learner)) { Snack.Add("Choose a learner.", Severity.Warning); return; }
+        _busy = true;
+        var ok = _editing == null
+            ? await Run(async () => await Api.Send("/enrollments", "POST", new { learnerId = _learner, subjectIds = _picked.ToArray() }), "Pending subscription created.")
+            : await Run(async () => await Api.Send($"/enrollments/{_editing.S("id")}", "PATCH", new { action = "change", subjectIds = _picked.ToArray() }), "Subjects updated.");
+        if (ok) { CancelEdit(); await Reload(); }
+        _busy = false;
+    }
+    async Task Act(JsonNode e, string action)
+    {
+        if (action == "cancel" && !await Confirm("Cancel subscription", "Cancel this subscription? Refund terms apply within 30 days.")) return;
+        if (await Run(async () => await Api.Send($"/enrollments/{e.S("id")}", "PATCH", new { action }), action == "cancel" ? "Cancellation recorded." : "Subscription resumed.")) await Reload();
+    }
+}

@@ -1,0 +1,76 @@
+@page "/classes"
+@inherits GuruPage
+
+<Frame Title="Classes" Subtitle="Two weekly 60-minute classes per course. Use a manual HTTPS Teams or Zoom link." Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    @if (IsTutor)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border:1px solid #ddd3bd">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editId == null ? "Schedule a session" : "Edit session")</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="4"><MudSelect T="string" @bind-Value="_course" Label="Course" Variant="Variant.Outlined" Disabled="_editId != null">@foreach (var c in _courses) { <MudSelectItem T="string" Value="@c.S("id")">@c.S("title")</MudSelectItem> }</MudSelect></MudItem>
+                <MudItem xs="12" md="4"><MudTextField T="string" @bind-Value="_title" Label="Session title" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField T="string" @bind-Value="_starts" Label="Starts (SAST)" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12"><MudTextField T="string" @bind-Value="_url" Label="Meeting link (https://...)" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12"><MudTextField T="string" @bind-Value="_plan" Label="Private lesson plan (visible to tutors only)" Lines="3" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_busy">@(_editId == null ? "Create session" : "Save changes")</MudButton>
+            @if (_editId != null) { <MudButton Class="mt-3 ml-2" OnClick="Reset">Discard</MudButton> }
+        </MudPaper>
+    }
+    @if (_sessions.Count == 0) { <Empty Icon="@Icons.Material.Filled.Event" Title="No classes scheduled" Text="@(IsTutor ? "Create a course first, then schedule sessions." : "Scheduled classes for active subscriptions appear here.")" /> }
+    else
+    {
+        @foreach (var s in _sessions)
+        {
+            var st = s.S("status"); var url = s.S("meetingUrl");
+            <MudPaper Elevation="0" Class="pa-4 mb-3" Style="border:1px solid #ddd3bd">
+                <MudStack Row Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Spacing="2">
+                    <div>
+                        <MudText Typo="Typo.subtitle1">@s.S("title")</MudText>
+                        <MudText Typo="Typo.body2">@s.S("courseTitle") &middot; @s.S("subjectName") &middot; @s.S("tutorName")</MudText>
+                        <MudText Typo="Typo.body2">@J.Date(s.S("startsAt")) &middot; @s.I("durationMinutes") min</MudText>
+                        <MudChip T="string" Size="Size.Small" Class="mt-1" Color="@(st == "live" ? Color.Success : st == "cancelled" ? Color.Error : Color.Default)">@st</MudChip>
+                        @if (IsTutor && s.S("lessonPlan") != "") { <MudText Typo="Typo.body2" Class="mt-2" Style="white-space:pre-wrap"><b>Lesson plan:</b> @s.S("lessonPlan")</MudText> }
+                    </div>
+                    <MudStack Spacing="1" AlignItems="AlignItems.End">
+                        @if (url != "" && st != "cancelled" && st != "completed") { <MudButton Href="@url" Target="_blank" Variant="Variant.Filled" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.VideoCall">Join class</MudButton> }
+                        @if (IsTutor)
+                        {
+                            <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="() => Edit(s)">Edit</MudButton>
+                                @if (st == "scheduled") { <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick='() => SetStatus(s, "live")'>Go live</MudButton> }
+                                @if (st == "live" || st == "scheduled") { <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick='() => SetStatus(s, "completed")'>Complete</MudButton> }
+                                @if (st == "scheduled" || st == "live") { <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined" OnClick='() => SetStatus(s, "cancelled")'>Cancel</MudButton> }
+                            </MudStack>
+                        }
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</Frame>
+
+@code {
+    List<JsonNode> _sessions = new(), _courses = new(); string _course = "", _title = "", _starts = "", _url = "", _plan = ""; string? _editId; bool _busy;
+    protected override async Task Load() { _sessions = (await Api.Send("/sessions")).L(); if (IsTutor) _courses = (await Api.Send("/courses")).L(); }
+    void Reset() { _editId = null; _title = _starts = _url = _plan = ""; }
+    void Edit(JsonNode s) { _editId = s.S("id"); _title = s.S("title"); _starts = J.ToLocalInput(s.S("startsAt")); _url = s.S("meetingUrl"); _plan = s.S("lessonPlan"); }
+    async Task Save()
+    {
+        if (_title.Trim().Length < 2 || string.IsNullOrEmpty(_starts)) { Snack.Add("Enter a title and start time.", Severity.Warning); return; }
+        if (!J.Https(_url)) { Snack.Add("Meeting links must start with https://", Severity.Warning); return; }
+        if (_editId == null && string.IsNullOrEmpty(_course)) { Snack.Add("Choose a course.", Severity.Warning); return; }
+        var url = string.IsNullOrWhiteSpace(_url) ? null : _url.Trim(); var plan = string.IsNullOrWhiteSpace(_plan) ? null : _plan.Trim();
+        _busy = true;
+        var ok = _editId == null
+            ? await Run(async () => await Api.Send("/sessions", "POST", new { courseId = _course, title = _title.Trim(), startsAt = J.ToIso(_starts), durationMinutes = 60, meetingUrl = url, lessonPlan = plan }), "Session created.")
+            : await Run(async () => await Api.Send($"/sessions/{_editId}", "PATCH", new { title = _title.Trim(), startsAt = J.ToIso(_starts), durationMinutes = 60, meetingUrl = url, lessonPlan = plan }), "Session updated.");
+        if (ok) { Reset(); await Reload(); }
+        _busy = false;
+    }
+    async Task SetStatus(JsonNode s, string status)
+    {
+        if (status == "cancelled" && !await Confirm("Cancel session", "Cancel this class for all learners?")) return;
+        if (await Run(async () => await Api.Send($"/sessions/{s.S("id")}", "PATCH", new { status }), "Session " + status + ".")) await Reload();
+    }
+}

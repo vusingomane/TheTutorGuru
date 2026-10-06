@@ -1,0 +1,84 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject GuruApi Api
+@inject NavigationManager Nav
+@inject ISnackbar Snack
+
+<MudThemeProvider Theme="_theme" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudLayout>
+    <MudAppBar Elevation="0" Color="Color.Primary">
+        @if (Api.Profile != null)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Class="d-md-none" OnClick="() => _open = !_open" aria-label="Menu" />
+        }
+        <MudLink Href="/" Underline="Underline.None" Color="Color.Inherit" Class="brand mud-typography-h6">TheTutor<span style="color:#f5b83d">Guru</span></MudLink>
+        <MudSpacer />
+        @if (Api.Profile != null)
+        {
+            <MudText Class="mr-3 d-none d-sm-flex" Typo="Typo.body2">@Api.Profile["fullName"]</MudText>
+            <MudButton Color="Color.Inherit" OnClick="SignOut" StartIcon="@Icons.Material.Filled.Logout">Sign out</MudButton>
+        }
+        else
+        {
+            <MudButton Color="Color.Inherit" Href="/sign-in">Sign in</MudButton>
+            <MudButton Color="Color.Secondary" Variant="Variant.Filled" Href="/sign-up">Get started</MudButton>
+        }
+    </MudAppBar>
+    @if (Api.Profile != null)
+    {
+        <MudDrawer @bind-Open="_open" Breakpoint="Breakpoint.Md" Variant="DrawerVariant.Responsive" Elevation="0">
+            <MudNavMenu Class="pa-2">
+                <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                <MudNavLink Href="/subjects" Icon="@Icons.Material.Filled.MenuBook">Subjects</MudNavLink>
+                @if (Api.Role == "parent")
+                {
+                    <MudNavLink Href="/learners" Icon="@Icons.Material.Filled.Groups">Learners</MudNavLink>
+                    <MudNavLink Href="/subscriptions" Icon="@Icons.Material.Filled.CreditCard">Subscriptions</MudNavLink>
+                }
+                @if (Api.Role == "tutor") { <MudNavLink Href="/learners" Icon="@Icons.Material.Filled.Groups">Attendance</MudNavLink> }
+                <MudNavLink Href="/classes" Icon="@Icons.Material.Filled.Event">Classes</MudNavLink>
+                <MudNavLink Href="/resources" Icon="@Icons.Material.Filled.Folder">Resources</MudNavLink>
+                <MudNavLink Href="/recordings" Icon="@Icons.Material.Filled.VideoLibrary">Recordings</MudNavLink>
+                <MudNavLink Href="/progress" Icon="@Icons.Material.Filled.QueryStats">Progress</MudNavLink>
+                <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
+            </MudNavMenu>
+        </MudDrawer>
+    }
+    <MudMainContent>@Body</MudMainContent>
+</MudLayout>
+
+@code {
+    bool _open = true;
+    static readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#164f4d", Secondary = "#f5b83d", SecondaryContrastText = "#10393a",
+            Tertiary = "#c2304f", Background = "#f8f3e8", Surface = "#fcf9f0",
+            AppbarBackground = "#10393a", TextPrimary = "#0f2f2e", Error = "#b3261e",
+            Success = "#2f7d4f", DrawerBackground = "#10393a", DrawerText = "#f4ecd8"
+        },
+        LayoutProperties = new LayoutProperties { DefaultBorderRadius = "8px" },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography { FontFamily = new[] { "DM Sans", "sans-serif" } },
+            H1 = new H1Typography { FontFamily = new[] { "Bricolage Grotesque", "sans-serif" }, FontWeight = "800" },
+            H2 = new H2Typography { FontFamily = new[] { "Bricolage Grotesque", "sans-serif" }, FontWeight = "800" },
+            H3 = new H3Typography { FontFamily = new[] { "Bricolage Grotesque", "sans-serif" }, FontWeight = "700" },
+            H4 = new H4Typography { FontFamily = new[] { "Bricolage Grotesque", "sans-serif" }, FontWeight = "700" },
+            H5 = new H5Typography { FontFamily = new[] { "Bricolage Grotesque", "sans-serif" }, FontWeight = "700" },
+            H6 = new H6Typography { FontFamily = new[] { "Bricolage Grotesque", "sans-serif" }, FontWeight = "700" },
+        }
+    };
+    protected override void OnInitialized() => Api.Changed += Refresh;
+    void Refresh() => InvokeAsync(StateHasChanged);
+    async Task SignOut()
+    {
+        try { await Api.Logout(); Nav.NavigateTo("/"); }
+        catch (Exception e) { Snack.Add(e.Message, Severity.Error); }
+    }
+    public void Dispose() => Api.Changed -= Refresh;
+}

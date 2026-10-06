@@ -1,0 +1,55 @@
+@page "/recordings"
+@inherits GuruPage
+
+<Frame Title="Recordings" Subtitle="Revise any class from a protected recording." Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    @if (IsTutor)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border:1px solid #ddd3bd">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Add a recording (MP4)</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="5"><MudSelect T="string" @bind-Value="_session" Label="Session" Variant="Variant.Outlined">@foreach (var s in _sessions) { <MudSelectItem T="string" Value="@s.S("id")">@s.S("title")</MudSelectItem> }</MudSelect></MudItem>
+                <MudItem xs="12" md="5"><MudTextField T="string" @bind-Value="_title" Label="Title" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="2"><MudNumericField T="int" @bind-Value="_minutes" Label="Minutes" Min="1" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12"><input type="file" id="recording-file" accept="video/mp4" /></MudItem>
+            </MudGrid>
+            @if (_busy) { <MudProgressLinear Indeterminate Class="mt-3" /> }
+            <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="Upload" Disabled="_busy">Upload and register</MudButton>
+        </MudPaper>
+    }
+    @if (_items.Count == 0) { <Empty Icon="@Icons.Material.Filled.VideoLibrary" Title="No recordings yet" Text="Recordings for active subscriptions appear here." /> }
+    else
+    {
+        <MudGrid>
+        @foreach (var r in _items)
+        {
+            <MudItem xs="12" md="6"><MudPaper Elevation="0" Class="pa-3" Style="border:1px solid #ddd3bd">
+                <video controls preload="metadata" style="width:100%;border-radius:6px;background:#10393a" src="@GuruApi.FileUrl(r.S("objectPath"))"></video>
+                <MudText Typo="Typo.subtitle1" Class="mt-2">@r.S("title")</MudText>
+                <MudText Typo="Typo.body2">@r.S("courseTitle") &middot; @r.S("sessionTitle") &middot; @(r.I("durationSeconds") / 60) min &middot; @J.Date(r.S("uploadedAt"))</MudText>
+            </MudPaper></MudItem>
+        }
+        </MudGrid>
+    }
+</Frame>
+
+@code {
+    List<JsonNode> _items = new(), _sessions = new(); string _session = "", _title = ""; int _minutes = 60; bool _busy;
+    [Inject] IJSRuntime Js { get; set; } = default!;
+    protected override async Task Load() { _items = (await Api.Send("/recordings")).L(); if (IsTutor) _sessions = (await Api.Send("/sessions")).L(); }
+    async Task Upload()
+    {
+        if (string.IsNullOrEmpty(_session) || _title.Trim().Length < 2 || _minutes < 1) { Snack.Add("Choose a session, title and duration.", Severity.Warning); return; }
+        _busy = true;
+        var ok = await Run(async () =>
+        {
+            var info = await Js.InvokeAsync<JsonObject?>("guru.fileInfo", "recording-file");
+            var type = info?.S("type");
+            if (type == null) throw new Exception("Choose an MP4 file first.");
+            if (type != "video/mp4") throw new Exception("Only MP4 video is accepted.");
+            var path = await Api.Upload("recording-file");
+            await Api.Send("/recordings", "POST", new { sessionId = _session, title = _title.Trim(), objectPath = path, durationSeconds = _minutes * 60 });
+        }, "Recording added.");
+        if (ok) { _title = ""; await Reload(); }
+        _busy = false;
+    }
+}

@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "python-base-3.13", "postgresql-16"]
+modules = ["nodejs-24", "python-base-3.13", "postgresql-16", "dotnet-10.0"]
 
 [deployment]
 router = "application"
@@ -11,13 +11,48 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "dotnet-build"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "legacy-types"
+
+[[workflows.workflow]]
+name = "dotnet-build"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "dotnet build artifacts/api-server/dotnet/TutorGuru.Api.csproj --nologo -v:q && dotnet build artifacts/the-tutor-guru/dotnet/TutorGuru.Web.csproj --nologo -v:q"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "legacy-types"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run typecheck"
+
+[workflows.workflow.metadata]
+isValidation = true
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
 
 [postMerge]
 path = "scripts/post-merge.sh"
-timeoutMs = 20000
+timeoutMs = 180000
 
 [nix]
 channel = "stable-25_05"

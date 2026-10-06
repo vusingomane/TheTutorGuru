@@ -4,33 +4,37 @@ A South African high-school tutoring platform for parents, learners, and tutors.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
+- `pnpm --filter @workspace/api-server run dev` — ASP.NET Core Minimal API (managed port 8080)
+- `pnpm --filter @workspace/the-tutor-guru run dev` — Blazor Server / MudBlazor web app
+- `pnpm run typecheck` — retained TypeScript source checks (not .NET validation)
+- `pnpm run build` — TypeScript check + .NET publish and other workspace builds
+- `pnpm --filter @workspace/api-server run test:migration` — isolated development API/ownership/access checks
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Identity schema is applied explicitly by the .NET operator migration tool; see `docs/architecture-migration.md`. Do not push the archived Drizzle schema over Identity tables.
+- Required env: `DATABASE_URL` and a stable `SESSION_SECRET` (32+ characters) protecting persisted Identity keys; never replace the latter casually.
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- .NET 10, C#, ASP.NET Core Minimal API, Blazor Server, MudBlazor
+- Existing PostgreSQL database with Dapper/Npgsql, no Entity Framework
+- ASP.NET Core Identity with a Dapper user store and persistent database keys
+- pnpm scripts orchestrate the artifact-managed .NET services
+- Original React/Express/Drizzle source and Orval clients retained for comparison/recovery, not actively served
 
 ## Where things live
 
-- Web app: `artifacts/the-tutor-guru`; frontend routes are in `src/pages`.
+- Web app: `artifacts/the-tutor-guru/dotnet`; Razor routes are in `Components/Pages`.
+- API: `artifacts/api-server/dotnet`; domain rules in `Domain`, auth in `Identity`, private files in `Storage`.
 - API contract: `lib/api-spec/openapi.yaml`; regenerate clients after any contract change.
-- Database schema: `lib/db/src/schema/tutoring.ts`.
-- Domain routes: `artifacts/api-server/src/routes/accounts.ts`, `classes.ts`, and `resources.ts`.
-- Clerk and App Storage are provisioned; their secrets must never be exposed.
+- Existing domain schema reference: `lib/db/src/schema/tutoring.ts`; new additive Identity schema: `artifacts/api-server/dotnet/Data/identity.sql`.
+- Original domain routes and React pages remain in their `src` folders as the migration baseline.
+- App Storage remains provisioned. Clerk is retained only for the old source and safe account migration; active sign-in uses Identity. Never expose secrets or `.data/`.
 
 ## Architecture decisions
 
-- This first runnable MVP uses the provided React/Express scaffold. The source brief's .NET Minimal API, MudBlazor, Dapper, and ASP.NET Core Identity architecture is not delivered by this implementation and must not be described as fulfilled.
+- The user explicitly approved replacing the MVP with the original .NET architecture after account/data consequences were explained. The active preview now uses that stack.
+- Existing profile IDs and ownership references are preserved. Migration requires a confirmed Identity email and a one-use invitation; matching email alone cannot claim an existing profile.
+- Development verification/reset emails go to a private operator mailbox. Production requires SMTP configuration and APP_ORIGIN before registration/recovery. See `docs/architecture-migration.md`.
 - Account roles are chosen at onboarding and cannot be changed by profile edits. Tutors manage only their own courses.
 - A learner is linked to a parent's learner record through the authenticated account's primary email address. Course access requires a paid enrolment with an unexpired billing period, or tutor ownership.
 - Uploads go directly to private App Storage. The server verifies upload ownership and metadata before attaching files; file delivery checks course access and supports byte ranges for recordings.
@@ -52,9 +56,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 - Run `pnpm --filter @workspace/api-spec run codegen` after contract changes.
 - Use the existing artifact-managed workflows; do not start replacement dev servers.
-- Apply development schema changes with the DB package's push script; never perform startup-time DDL.
+- Never perform startup-time DDL. Use the explicit additive Identity migration with a private backup and original-row fingerprint verification.
 - Catalogue seed courses belong to a system catalogue profile, not to a signed-in tutor. New tutors create their own courses.
-- The first build has static/type checks and a public preview check, but no automated signed-in browser pass.
+- ASP.NET Core Identity and MudBlazor builds are the primary architecture checks. Keep the legacy TypeScript check passing, but do not confuse it with verifying .NET.
 
 ## Pointers
 

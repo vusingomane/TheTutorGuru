@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "build": "vite build --config vite.config.ts",
-    "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
+    "dev": "cd dotnet && ASPNETCORE_ENVIRONMENT=Development dotnet run --no-launch-profile",
+    "build": "dotnet publish dotnet/TutorGuru.Web.csproj -c Release -o dotnet/publish",
+    "serve": "cd dotnet/publish && dotnet TutorGuru.Web.dll",
+    "dev:legacy": "vite --config vite.config.ts --host 0.0.0.0",
+    "build:legacy": "vite build --config vite.config.ts",
+    "serve:legacy": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

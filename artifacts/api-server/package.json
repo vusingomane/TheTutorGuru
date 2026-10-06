@@ -4,9 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
-    "build": "node ./build.mjs",
-    "start": "node --enable-source-maps ./dist/index.mjs",
+    "dev": "cd dotnet && ASPNETCORE_ENVIRONMENT=Development dotnet run --no-launch-profile",
+    "build": "dotnet publish dotnet/TutorGuru.Api.csproj -c Release -o dotnet/publish",
+    "start": "cd dotnet/publish && dotnet TutorGuru.Api.dll",
+    "dev:legacy": "export NODE_ENV=development && pnpm run build:legacy && pnpm run start:legacy",
+    "build:legacy": "node ./build.mjs",
+    "start:legacy": "node --enable-source-maps ./dist/index.mjs",
+    "test:migration": "node tests/architecture-migration.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

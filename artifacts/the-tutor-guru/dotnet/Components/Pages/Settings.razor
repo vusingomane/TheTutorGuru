@@ -1,0 +1,32 @@
+@page "/settings"
+@inherits GuruPage
+
+<Frame Title="Settings" Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    <MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd;max-width:560px">
+        <MudTextField T="string" Value="@Api.Profile.S("email")" Label="Email" ReadOnly Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" Value="@Api.Role" Label="Role (cannot be changed)" ReadOnly Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_name" Label="Full name" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_phone" Label="Phone" Variant="Variant.Outlined" Class="mb-3" />
+        @if (Api.Role == "learner")
+        {
+            <MudSelect T="int" @bind-Value="_grade" Label="Grade" Variant="Variant.Outlined">@foreach (var g in Enumerable.Range(8, 5)) { <MudSelectItem T="int" Value="g">Grade @g</MudSelectItem> }</MudSelect>
+        }
+        <MudButton Class="mt-4" Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Disabled="_busy">Save changes</MudButton>
+    </MudPaper>
+</Frame>
+
+@code {
+    string _name = "", _phone = ""; int _grade = 8; bool _busy;
+    protected override Task Load() { _name = Api.Profile.S("fullName"); _phone = Api.Profile.S("phone"); _grade = Api.Profile.I("grade") is > 0 and var g ? g : 8; return Task.CompletedTask; }
+    async Task Save()
+    {
+        if (_name.Trim().Length < 2) { Snack.Add("Enter your full name.", Severity.Warning); return; }
+        _busy = true;
+        if (await Run(async () =>
+        {
+            await Api.Send("/profile", "PUT", new { fullName = _name.Trim(), role = Api.Role, phone = string.IsNullOrWhiteSpace(_phone) ? null : _phone.Trim(), grade = Api.Role == "learner" ? (int?)_grade : null });
+            await Api.RefreshProfile();
+        }, "Settings saved.")) { }
+        _busy = false;
+    }
+}

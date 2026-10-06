@@ -1,0 +1,43 @@
+@page "/onboarding"
+@inherits GuruPage
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="py-12">
+    <MudPaper Class="pa-6" Elevation="0" Style="border:1px solid #ddd3bd">
+        <MudText Typo="Typo.h4" Class="mb-1">Tell us who you are</MudText>
+        <MudAlert Severity="Severity.Warning" Class="mb-4">Your role is chosen once and cannot be changed later.</MudAlert>
+        <MudAlert Severity="Severity.Info" Class="mb-4">Already used the previous app? <MudLink Href="/migrate">Link your existing account</MudLink> with your migration invitation to preserve your learners, courses and files.</MudAlert>
+        @if (_err != null) { <MudAlert Severity="Severity.Error" Class="mb-3">@_err</MudAlert> }
+        <MudRadioGroup T="string" @bind-Value="_role" Class="mb-3">
+            <MudRadio Value="@("parent")" Color="Color.Primary">Parent: arrange tutoring for my children</MudRadio>
+            <MudRadio Value="@("learner")" Color="Color.Primary">Learner: attend and revise</MudRadio>
+            <MudRadio Value="@("tutor")" Color="Color.Primary">Tutor: prepare and run classes</MudRadio>
+        </MudRadioGroup>
+        <MudTextField T="string" @bind-Value="_name" Label="Full name" Variant="Variant.Outlined" Class="mb-3" />
+        <MudTextField T="string" @bind-Value="_phone" Label="Phone (optional)" Variant="Variant.Outlined" Class="mb-3" />
+        @if (_role == "learner")
+        {
+            <MudSelect T="int" @bind-Value="_grade" Label="Grade" Variant="Variant.Outlined">
+                @foreach (var g in Enumerable.Range(8, 5)) { <MudSelectItem T="int" Value="g">Grade @g</MudSelectItem> }
+            </MudSelect>
+        }
+        <MudButton FullWidth Class="mt-4" Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit" Disabled="_busy || !Ready">Continue</MudButton>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    string _role = "parent", _name = "", _phone = ""; string? _err; int _grade = 8; bool _busy;
+    protected override bool NeedProfile => false;
+    protected override Task Load() { if (Api.Profile != null) Nav.NavigateTo("/dashboard"); return Task.CompletedTask; }
+    async Task Submit()
+    {
+        if (_name.Trim().Length < 2) { _err = "Enter your full name."; return; }
+        _busy = true; _err = null;
+        try
+        {
+            await Api.Send("/profile", "PUT", new { fullName = _name.Trim(), role = _role, phone = string.IsNullOrWhiteSpace(_phone) ? null : _phone.Trim(), grade = _role == "learner" ? (int?)_grade : null });
+            await Api.RefreshProfile(); Nav.NavigateTo("/dashboard");
+        }
+        catch (Exception e) { _err = e.Message; }
+        _busy = false;
+    }
+}

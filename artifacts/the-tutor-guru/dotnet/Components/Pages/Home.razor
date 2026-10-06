@@ -1,0 +1,72 @@
+@page "/"
+@inject GuruApi Api
+@inject NavigationManager Nav
+
+<div class="hero grid-paper">
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-12 py-md-16">
+    <MudGrid Spacing="6" Style="align-items:center">
+        <MudItem xs="12" md="7">
+            <MudText Typo="Typo.overline" Color="Color.Tertiary">High-school tutoring, grades 8 to 12</MudText>
+            <MudText Typo="Typo.h2" Class="my-3">Affordable maths and science help, <span class="hl">built for South African families</span></MudText>
+            <MudText Typo="Typo.h6" Class="mb-6" Style="font-family:'DM Sans';font-weight:400">Two live 60-minute classes every week, recordings to revise from, and a tutor who prepares the lesson.</MudText>
+            <MudStack Row Spacing="2">
+                <MudButton Href="/sign-up" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large">Create a parent account</MudButton>
+                <MudButton Href="/sign-in" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Large">Sign in</MudButton>
+            </MudStack>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Elevation="0" Class="pa-6" Style="border:1px solid #ddd3bd">
+                <MudText Typo="Typo.overline">Monthly pricing</MudText>
+                <MudText Typo="Typo.h3">R290 <span style="font-size:1rem;font-weight:400">one subject</span></MudText>
+                <MudText Typo="Typo.h3">R495 <span style="font-size:1rem;font-weight:400">two subjects</span></MudText>
+                <MudDivider Class="my-3" />
+                <MudList T="string" Dense>
+                    <MudListItem Icon="@Icons.Material.Filled.Event">Two weekly 60-minute classes per subject</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Groups">Classes of 30 to 180 learners, voice and text</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Undo">Full refund within 30 days</MudListItem>
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+</div>
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-10">
+    <MudText Typo="Typo.h4" Class="mb-4">Subjects we teach</MudText>
+    @if (_error != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-3">@_error <MudButton OnClick="Load" Color="Color.Inherit">Retry</MudButton></MudAlert>
+    }
+    else if (_subjects == null)
+    {
+        <MudGrid>@for (var i = 0; i < 4; i++) { <MudItem xs="12" sm="6" md="3"><MudSkeleton Height="140px" SkeletonType="SkeletonType.Rectangle" /></MudItem> }</MudGrid>
+    }
+    else if (_subjects.Count == 0) { <MudAlert Severity="Severity.Info">Subjects will appear here once they are published.</MudAlert> }
+    else
+    {
+        <MudGrid>
+        @foreach (var s in _subjects)
+        {
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4 h-100" Style="border:1px solid #ddd3bd">
+                    <MudText Typo="Typo.h6">@s.S("name")</MudText>
+                    <MudText Typo="Typo.body2" Class="my-1">Grades @GradeRange(s)</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@s.S("description")</MudText>
+                </MudPaper>
+            </MudItem>
+        }
+        </MudGrid>
+    }
+    <MudAlert Severity="Severity.Normal" Class="mt-8" Icon="@Icons.Material.Filled.Info">Online payments are not enabled yet. New subscriptions stay pending and do not grant class content until payment is confirmed.</MudAlert>
+</MudContainer>
+
+@code {
+    List<JsonNode>? _subjects; string? _error;
+    internal static string GradeRange(JsonNode s) { var g = s.L("grades").Select(x => x.GetValue<int>()).OrderBy(x => x).ToList(); return g.Count == 0 ? "" : $"{g.First()} to {g.Last()}"; }
+    protected override async Task OnAfterRenderAsync(bool first) { if (first) await Load(); }
+    async Task Load()
+    {
+        _error = null;
+        try { _subjects = (await Api.Send("/subjects")).L(); } catch (Exception e) { _error = e.Message; }
+        StateHasChanged();
+    }
+}

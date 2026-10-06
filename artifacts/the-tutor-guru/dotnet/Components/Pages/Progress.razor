@@ -1,0 +1,27 @@
+@page "/progress"
+@inherits GuruPage
+
+<Frame Title="Progress" Subtitle="Attendance by learner and subject." Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    @if (_rows.Count == 0) { <Empty Icon="@Icons.Material.Filled.QueryStats" Title="No reports yet" Text="Reports appear after classes have been marked." /> }
+    else
+    {
+        <MudGrid>
+        @foreach (var r in _rows)
+        {
+            var pct = r.D("attendancePercent");
+            <MudItem xs="12" md="6"><MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd">
+                <MudText Typo="Typo.subtitle1">@r.S("learnerName") &middot; Grade @r.I("grade")</MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">@r.S("subjectName") &middot; @r.I("classesAttended") of @r.I("classesTotal") classes</MudText>
+                <MudProgressLinear Value="pct" Max="100" Color="@(pct >= 75 ? Color.Success : pct >= 50 ? Color.Warning : Color.Error)" Size="Size.Large" />
+                <MudText Typo="Typo.h6" Class="mt-1">@pct.ToString("0.#")%</MudText>
+                @if (r["averageScore"] != null) { <MudText Typo="Typo.body2">Average score: @r.D("averageScore").ToString("0.#")</MudText> }
+            </MudPaper></MudItem>
+        }
+        </MudGrid>
+    }
+</Frame>
+
+@code {
+    List<JsonNode> _rows = new();
+    protected override async Task Load() => _rows = (await Api.Send("/progress")).L();
+}

@@ -1,0 +1,27 @@
+@page "/dashboard"
+@inherits GuruPage
+
+<Frame Title="@("Hello, " + Api.Profile?["fullName"])" Subtitle="@RoleLine" Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="4"><MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd"><MudText Typo="Typo.overline">Upcoming sessions</MudText><MudText Typo="Typo.h3">@_o.I("upcomingSessions")</MudText></MudPaper></MudItem>
+        <MudItem xs="12" sm="4"><MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd"><MudText Typo="Typo.overline">Active subjects</MudText><MudText Typo="Typo.h3">@_o.I("activeSubjects")</MudText></MudPaper></MudItem>
+        <MudItem xs="12" sm="4"><MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd"><MudText Typo="Typo.overline">Learners</MudText><MudText Typo="Typo.h3">@_o.I("totalLearners")</MudText></MudPaper></MudItem>
+    </MudGrid>
+    <MudText Typo="Typo.h6" Class="mb-2">Recent activity</MudText>
+    @if (_o.L("recentActivity").Count == 0) { <Empty Icon="@Icons.Material.Filled.History" Title="Nothing yet" Text="Activity from classes, subscriptions and attendance will show here." /> }
+    else
+    {
+        <MudList T="string" Dense>
+        @foreach (var a in _o.L("recentActivity"))
+        {
+            <MudListItem><MudText Typo="Typo.subtitle2">@a.S("title")</MudText><MudText Typo="Typo.body2">@a.S("detail") &middot; @J.Date(a.S("createdAt"))</MudText></MudListItem>
+        }
+        </MudList>
+    }
+</Frame>
+
+@code {
+    JsonNode? _o;
+    string RoleLine => Api.Role switch { "parent" => "Parent overview", "tutor" => "Tutor overview", _ => "Learner overview" };
+    protected override async Task Load() => _o = await Api.Send("/overview");
+}

@@ -1,0 +1,29 @@
+@page "/verify-email"
+@inject GuruApi Api
+@inject NavigationManager Nav
+
+<MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="py-12">
+    <MudPaper Class="pa-6" Elevation="0" Style="border:1px solid #ddd3bd">
+        <MudText Typo="Typo.h4" Class="mb-4">Email verification</MudText>
+        @if (_state == 0) { <MudProgressLinear Indeterminate Color="Color.Primary" /> <MudText Class="mt-2">Verifying your email...</MudText> }
+        else if (_state == 1) { <MudAlert Severity="Severity.Success">Your email is verified. You can sign in now.</MudAlert> <MudButton Href="/sign-in" Class="mt-4" Variant="Variant.Filled" Color="Color.Primary">Sign in</MudButton> }
+        else { <MudAlert Severity="Severity.Error">@_err</MudAlert> <MudButton Href="/sign-in" Class="mt-4" Variant="Variant.Outlined">Go to sign in to resend</MudButton> }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    int _state; string _err = "";
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+        var q = System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query);
+        var uid = q["userId"]; var tok = q["token"];
+        if (string.IsNullOrEmpty(uid) || string.IsNullOrEmpty(tok)) { _err = "This verification link is incomplete."; _state = 2; }
+        else
+        {
+            try { await Api.Send("/auth/confirm-email", "POST", new { userId = uid, token = tok }); _state = 1; }
+            catch (Exception e) { _err = e.Message; _state = 2; }
+        }
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,59 @@
+@page "/resources"
+@inherits GuruPage
+
+<Frame Title="Resources" Subtitle="Class notes and worksheets." Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    @if (IsTutor)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border:1px solid #ddd3bd">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Upload material</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="5"><MudSelect T="string" @bind-Value="_course" Label="Course" Variant="Variant.Outlined">@foreach (var c in _courses) { <MudSelectItem T="string" Value="@c.S("id")">@c.S("title")</MudSelectItem> }</MudSelect></MudItem>
+                <MudItem xs="12" md="7"><MudTextField T="string" @bind-Value="_title" Label="Title" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12"><input type="file" id="material-file" /></MudItem>
+            </MudGrid>
+            @if (_busy) { <MudProgressLinear Indeterminate Class="mt-3" /> }
+            <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="Upload" Disabled="_busy">Upload and register</MudButton>
+        </MudPaper>
+    }
+    @if (_items.Count == 0) { <Empty Icon="@Icons.Material.Filled.Folder" Title="No resources yet" Text="Materials for your active courses appear here." /> }
+    else
+    {
+        @foreach (var m in _items)
+        {
+            <MudPaper Elevation="0" Class="pa-3 mb-2" Style="border:1px solid #ddd3bd">
+                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <div><MudText Typo="Typo.subtitle1">@m.S("title")</MudText><MudText Typo="Typo.body2">@m.S("courseTitle") &middot; @m.S("originalFileName") &middot; @J.Size(m.D("sizeBytes")) &middot; @J.Date(m.S("uploadedAt"))</MudText></div>
+                    <MudStack Row>
+                        <MudButton Href="@GuruApi.FileUrl(m.S("objectPath"))" Target="_blank" StartIcon="@Icons.Material.Filled.Download" Variant="Variant.Outlined">Download</MudButton>
+                        @if (IsTutor) { <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" aria-label="Delete" OnClick="() => Delete(m)" /> }
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+        }
+    }
+</Frame>
+
+@code {
+    List<JsonNode> _items = new(), _courses = new(); string _course = "", _title = ""; bool _busy;
+    protected override async Task Load() { _items = (await Api.Send("/materials")).L(); if (IsTutor) _courses = (await Api.Send("/courses")).L(); }
+    [Inject] IJSRuntime Js { get; set; } = default!;
+    async Task Upload()
+    {
+        if (string.IsNullOrEmpty(_course) || _title.Trim().Length < 2) { Snack.Add("Choose a course and enter a title.", Severity.Warning); return; }
+        _busy = true;
+        var ok = await Run(async () =>
+        {
+            var info = await Js.InvokeAsync<JsonObject>("guru.fileInfo", "material-file");
+            if (info == null) throw new Exception("Choose a file first.");
+            var path = await Api.Upload("material-file");
+            await Api.Send("/materials", "POST", new { courseId = _course, title = _title.Trim(), originalFileName = info.S("name"), objectPath = path, contentType = info.S("type"), sizeBytes = info.I("size") });
+        }, "Material uploaded.");
+        if (ok) { _title = ""; await Reload(); }
+        _busy = false;
+    }
+    async Task Delete(JsonNode m)
+    {
+        if (!await Confirm("Delete material", $"Delete \"{m.S("title")}\"?")) return;
+        if (await Run(async () => await Api.Send($"/materials/{m.S("id")}", "DELETE"), "Material deleted.")) await Reload();
+    }
+}

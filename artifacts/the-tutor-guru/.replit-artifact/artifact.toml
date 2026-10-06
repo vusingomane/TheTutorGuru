@@ -1,27 +1,28 @@
 kind = "web"
 previewPath = "/"
 title = "TheTutorGuru"
-description = "A South African online high-school tutoring platform for parents, learners, and tutors, with subject subscriptions, live class scheduling, lesson materials, recordings, and progress tracking."
+description = "South African high-school tutoring, built with MudBlazor and ASP.NET Core Identity."
 version = "1.0.0"
 id = "artifacts/the-tutor-guru"
 router = "path"
 
 [[services]]
 name = "web"
-paths = [ "/" ]
+paths = ["/"]
 localPort = 25958
 
 [services.development]
 run = "pnpm --filter @workspace/the-tutor-guru run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/the-tutor-guru", "run", "build" ]
-serve = "static"
-publicDir = "artifacts/the-tutor-guru/dist/public"
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/the-tutor-guru", "run", "build"]
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
+[services.production.run]
+args = ["pnpm", "--filter", "@workspace/the-tutor-guru", "run", "serve"]
+
+[services.production.run.env]
+PORT = "25958"
+ASPNETCORE_ENVIRONMENT = "Production"
 
 [services.env]
 PORT = "25958"

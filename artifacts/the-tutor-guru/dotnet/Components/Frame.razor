@@ -1,0 +1,21 @@
+<MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+    <MudText Typo="Typo.h4">@Title</MudText>
+    @if (!string.IsNullOrEmpty(Subtitle)) { <MudText Class="mb-4" Color="Color.Default">@Subtitle</MudText> }
+    @if (Error != null)
+    {
+        <MudAlert Severity="Severity.Error" Class="my-3">@Error <MudButton Color="Color.Inherit" OnClick="OnRetry">Retry</MudButton></MudAlert>
+    }
+    else if (Loading)
+    {
+        <MudSkeleton Height="60px" Class="my-2" /><MudSkeleton Height="60px" Class="my-2" /><MudSkeleton Height="60px" Class="my-2" />
+    }
+    else { @ChildContent }
+</MudContainer>
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

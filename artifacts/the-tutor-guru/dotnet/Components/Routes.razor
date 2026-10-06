@@ -1,0 +1,14 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(MainLayout)">
+            <MudContainer MaxWidth="MaxWidth.Small" Class="py-16">
+                <MudText Typo="Typo.h3">Page not found</MudText>
+                <MudText Class="my-4">That page does not exist.</MudText>
+                <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary">Back home</MudButton>
+            </MudContainer>
+        </LayoutView>
+    </NotFound>
+</Router>

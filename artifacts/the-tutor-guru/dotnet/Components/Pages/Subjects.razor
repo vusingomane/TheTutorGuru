@@ -1,0 +1,64 @@
+@page "/subjects"
+@inherits GuruPage
+
+<Frame Title="Subjects" Subtitle="Grade rules: Mathematics 8-12, Maths Literacy and Physical Science 10-12, Afrikaans 11-12." Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    <MudGrid Class="mb-6">
+    @foreach (var s in _subjects)
+    {
+        <MudItem xs="12" sm="6" md="3"><MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd"><MudText Typo="Typo.h6">@s.S("name")</MudText><MudText Typo="Typo.body2">Grades @Home.GradeRange(s)</MudText><MudText Typo="Typo.body2">@s.S("description")</MudText></MudPaper></MudItem>
+    }
+    </MudGrid>
+    <MudText Typo="Typo.h5" Class="mb-2">Courses</MudText>
+    @if (IsTutor)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border:1px solid #ddd3bd">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Create a course</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="4"><MudSelect T="string" @bind-Value="_subjectId" Label="Subject" Variant="Variant.Outlined">@foreach (var s in _subjects) { <MudSelectItem T="string" Value="@s.S("id")">@s.S("name")</MudSelectItem> }</MudSelect></MudItem>
+                <MudItem xs="12" md="8"><MudTextField T="string" @bind-Value="_title" Label="Course title" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="6" md="3"><MudSelect T="int" @bind-Value="_min" Label="Lowest grade" Variant="Variant.Outlined">@foreach (var g in Enumerable.Range(8, 5)) { <MudSelectItem T="int" Value="g">@g</MudSelectItem> }</MudSelect></MudItem>
+                <MudItem xs="6" md="3"><MudSelect T="int" @bind-Value="_max" Label="Highest grade" Variant="Variant.Outlined">@foreach (var g in Enumerable.Range(8, 5)) { <MudSelectItem T="int" Value="g">@g</MudSelectItem> }</MudSelect></MudItem>
+                <MudItem xs="12" md="6"><MudTextField T="string" @bind-Value="_sched" Label="Schedule (e.g. Tue and Thu 17:00)" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="Create" Disabled="_busy">Create course</MudButton>
+        </MudPaper>
+    }
+    @if (_courses.Count == 0) { <Empty Icon="@Icons.Material.Filled.MenuBook" Title="No courses yet" Text="@(IsTutor ? "Create the first course above." : "Tutors have not published courses yet.")" /> }
+    else
+    {
+        <MudGrid>
+        @foreach (var c in _courses)
+        {
+            <MudItem xs="12" md="6"><MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd">
+                <MudText Typo="Typo.subtitle1">@c.S("title")</MudText>
+                <MudText Typo="Typo.body2">@c.S("subjectName") &middot; Grades @c.I("gradeMin")-@c.I("gradeMax") &middot; @c.S("tutorName")</MudText>
+                @if (c.S("scheduleSummary") != "") { <MudChip T="string" Size="Size.Small" Class="mt-2">@c.S("scheduleSummary")</MudChip> }
+            </MudPaper></MudItem>
+        }
+        </MudGrid>
+    }
+</Frame>
+
+@code {
+    List<JsonNode> _subjects = new(), _courses = new();
+    string _subjectId = "", _title = "", _sched = ""; int _min = 8, _max = 12; bool _busy;
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first) return;
+        try { await Api.RefreshProfile(); Ready = true; await Reload(); }
+        catch (Exception e) { LoadError = e.Message; Loading = false; StateHasChanged(); }
+    }
+    protected override async Task Load() { _subjects = (await Api.Send("/subjects")).L(); _courses = (await Api.Send("/courses")).L(); }
+    async Task Create()
+    {
+        var s = _subjects.FirstOrDefault(x => x.S("id") == _subjectId);
+        if (s == null) { Snack.Add("Choose a subject.", Severity.Warning); return; }
+        if (_title.Trim().Length < 2) { Snack.Add("Enter a course title.", Severity.Warning); return; }
+        var grades = s.L("grades").Select(x => x.GetValue<int>()).ToList();
+        if (_min > _max || grades.Count > 0 && (_min < grades.Min() || _max > grades.Max())) { Snack.Add($"{s.S("name")} is offered for grades {Home.GradeRange(s)}.", Severity.Warning); return; }
+        _busy = true;
+        if (await Run(async () => await Api.Send("/courses", "POST", new { subjectId = _subjectId, title = _title.Trim(), gradeMin = _min, gradeMax = _max, scheduleSummary = string.IsNullOrWhiteSpace(_sched) ? null : _sched.Trim() }), "Course created."))
+        { _title = ""; _sched = ""; await Reload(); }
+        _busy = false;
+    }
+}

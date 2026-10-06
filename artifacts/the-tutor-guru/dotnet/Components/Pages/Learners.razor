@@ -1,0 +1,67 @@
+@page "/learners"
+@inherits GuruPage
+
+<Frame Title="@(IsTutor ? "Attendance" : "Learners")" Subtitle="@(IsTutor ? "Choose a session and mark who attended." : "Add the learners you pay for.")" Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    @if (IsParent)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border:1px solid #ddd3bd">
+            <MudGrid>
+                <MudItem xs="12" md="4"><MudTextField T="string" @bind-Value="_name" Label="Learner name" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="6" md="2"><MudSelect T="int" @bind-Value="_grade" Label="Grade" Variant="Variant.Outlined">@foreach (var g in Enumerable.Range(8, 5)) { <MudSelectItem T="int" Value="g">@g</MudSelectItem> }</MudSelect></MudItem>
+                <MudItem xs="12" md="4"><MudTextField T="string" @bind-Value="_email" Label="Learner email" InputType="InputType.Email" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="2"><MudButton FullWidth Class="mt-2" Variant="Variant.Filled" Color="Color.Primary" OnClick="Add" Disabled="_busy">Add learner</MudButton></MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+    @if (IsTutor)
+    {
+        <MudSelect T="string" @bind-Value="_session" Label="Session" Variant="Variant.Outlined" Class="mb-4">
+            @foreach (var s in _sessions) { <MudSelectItem T="string" Value="@s.S("id")">@s.S("title") - @J.Date(s.S("startsAt"))</MudSelectItem> }
+        </MudSelect>
+    }
+    @if (_learners.Count == 0) { <Empty Icon="@Icons.Material.Filled.Groups" Title="No learners yet" Text="@(IsParent ? "Add your first learner above." : "Learners appear once they have an active subscription.")" /> }
+    else
+    {
+        <MudPaper Elevation="0" Style="border:1px solid #ddd3bd">
+        <MudList T="string">
+        @foreach (var l in _learners)
+        {
+            var id = l.S("id");
+            <MudListItem>
+                <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <div><MudText Typo="Typo.subtitle1">@l.S("name")</MudText><MudText Typo="Typo.body2">Grade @l.I("grade") &middot; @l.S("email")</MudText></div>
+                    @if (IsTutor)
+                    {
+                        <MudStack Row Spacing="1">
+                            <MudButton Size="Size.Small" Variant="@(_att.GetValueOrDefault(id) == true ? Variant.Filled : Variant.Outlined)" Color="Color.Success" Disabled="string.IsNullOrEmpty(_session)" OnClick="() => Mark(id, true)">Present</MudButton>
+                            <MudButton Size="Size.Small" Variant="@(_att.GetValueOrDefault(id) == false ? Variant.Filled : Variant.Outlined)" Color="Color.Error" Disabled="string.IsNullOrEmpty(_session)" OnClick="() => Mark(id, false)">Absent</MudButton>
+                        </MudStack>
+                    }
+                </MudStack>
+            </MudListItem>
+        }
+        </MudList>
+        </MudPaper>
+    }
+</Frame>
+
+@code {
+    List<JsonNode> _learners = new(), _sessions = new(); string _name = "", _email = "", _session = ""; int _grade = 8; bool _busy;
+    Dictionary<string, bool> _att = new();
+    protected override async Task Load()
+    {
+        _learners = (await Api.Send("/learners")).L();
+        if (IsTutor) _sessions = (await Api.Send("/sessions")).L();
+    }
+    async Task Add()
+    {
+        if (_name.Trim().Length < 2 || !_email.Contains('@')) { Snack.Add("Enter the learner's name and a valid email.", Severity.Warning); return; }
+        _busy = true;
+        if (await Run(async () => await Api.Send("/learners", "POST", new { name = _name.Trim(), grade = _grade, email = _email.Trim() }), "Learner added.")) { _name = ""; _email = ""; await Reload(); }
+        _busy = false;
+    }
+    async Task Mark(string learnerId, bool attended)
+    {
+        if (await Run(async () => await Api.Send($"/attendance/{_session}/{learnerId}", "PUT", new { attended }), attended ? "Marked present." : "Marked absent.")) _att[learnerId] = attended;
+    }
+}
