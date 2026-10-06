@@ -20,4 +20,6 @@ export interface ClassSession {
   meetingUrl?: string | null;
   tutorName: string;
   attendanceCount?: number;
+  /** @nullable */
+  lessonPlan?: string | null;
 }

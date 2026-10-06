@@ -90,6 +90,39 @@ export const GetOverviewResponse = zod.object({
 
 
 /**
+ * @summary Create a course owned by the current tutor
+ */
+export const createCourseBodyTitleMin = 2;
+
+export const createCourseBodyGradeMinMin = 8;
+export const createCourseBodyGradeMinMax = 12;
+
+export const createCourseBodyGradeMaxMin = 8;
+export const createCourseBodyGradeMaxMax = 12;
+
+
+
+export const CreateCourseBody = zod.object({
+  "subjectId": zod.string(),
+  "title": zod.string().min(createCourseBodyTitleMin),
+  "gradeMin": zod.number().int().min(createCourseBodyGradeMinMin).max(createCourseBodyGradeMinMax),
+  "gradeMax": zod.number().int().min(createCourseBodyGradeMaxMin).max(createCourseBodyGradeMaxMax),
+  "scheduleSummary": zod.string().nullish()
+})
+
+export const CreateCourseResponse = zod.object({
+  "id": zod.string(),
+  "subjectId": zod.string(),
+  "subjectName": zod.string(),
+  "title": zod.string(),
+  "gradeMin": zod.number().int(),
+  "gradeMax": zod.number().int(),
+  "tutorName": zod.string(),
+  "scheduleSummary": zod.string().nullish()
+})
+
+
+/**
  * @summary List courses visible to the signed-in user
  */
 export const listCoursesQueryGradeMin = 8;
@@ -166,8 +199,13 @@ export const UpdateEnrollmentParams = zod.object({
   "enrollmentId": zod.coerce.string()
 })
 
+export const updateEnrollmentBodySubjectIdsMax = 2;
+
+
+
 export const UpdateEnrollmentBody = zod.object({
-  "action": zod.enum(['cancel', 'resume'])
+  "action": zod.enum(['cancel', 'resume', 'change']),
+  "subjectIds": zod.array(zod.string()).min(1).max(updateEnrollmentBodySubjectIdsMax).optional()
 })
 
 export const UpdateEnrollmentResponse = zod.object({
@@ -250,7 +288,8 @@ export const ListSessionsResponseItem = zod.object({
   "status": zod.enum(['scheduled', 'live', 'completed', 'cancelled']),
   "meetingUrl": zod.string().url().nullish(),
   "tutorName": zod.string(),
-  "attendanceCount": zod.number().int().optional()
+  "attendanceCount": zod.number().int().optional(),
+  "lessonPlan": zod.string().nullish()
 })
 export const ListSessionsResponse = zod.array(ListSessionsResponseItem)
 
@@ -260,8 +299,8 @@ export const ListSessionsResponse = zod.array(ListSessionsResponseItem)
  */
 export const createSessionBodyTitleMin = 2;
 
-export const createSessionBodyDurationMinutesMin = 15;
-export const createSessionBodyDurationMinutesMax = 180;
+export const createSessionBodyDurationMinutesMin = 60;
+export const createSessionBodyDurationMinutesMax = 60;
 
 
 
@@ -270,7 +309,8 @@ export const CreateSessionBody = zod.object({
   "title": zod.string().min(createSessionBodyTitleMin),
   "startsAt": zod.coerce.date(),
   "durationMinutes": zod.number().int().min(createSessionBodyDurationMinutesMin).max(createSessionBodyDurationMinutesMax),
-  "meetingUrl": zod.string().url().nullish()
+  "meetingUrl": zod.string().url().nullish(),
+  "lessonPlan": zod.string().nullish()
 })
 
 export const CreateSessionResponse = zod.object({
@@ -284,7 +324,8 @@ export const CreateSessionResponse = zod.object({
   "status": zod.enum(['scheduled', 'live', 'completed', 'cancelled']),
   "meetingUrl": zod.string().url().nullish(),
   "tutorName": zod.string(),
-  "attendanceCount": zod.number().int().optional()
+  "attendanceCount": zod.number().int().optional(),
+  "lessonPlan": zod.string().nullish()
 })
 
 
@@ -297,8 +338,8 @@ export const UpdateSessionParams = zod.object({
 
 export const updateSessionBodyTitleMin = 2;
 
-export const updateSessionBodyDurationMinutesMin = 15;
-export const updateSessionBodyDurationMinutesMax = 180;
+export const updateSessionBodyDurationMinutesMin = 60;
+export const updateSessionBodyDurationMinutesMax = 60;
 
 
 
@@ -307,7 +348,8 @@ export const UpdateSessionBody = zod.object({
   "startsAt": zod.coerce.date().optional(),
   "durationMinutes": zod.number().int().min(updateSessionBodyDurationMinutesMin).max(updateSessionBodyDurationMinutesMax).optional(),
   "status": zod.enum(['scheduled', 'live', 'completed', 'cancelled']).optional(),
-  "meetingUrl": zod.string().url().nullish()
+  "meetingUrl": zod.string().url().nullish(),
+  "lessonPlan": zod.string().nullish()
 })
 
 export const UpdateSessionResponse = zod.object({
@@ -321,7 +363,8 @@ export const UpdateSessionResponse = zod.object({
   "status": zod.enum(['scheduled', 'live', 'completed', 'cancelled']),
   "meetingUrl": zod.string().url().nullish(),
   "tutorName": zod.string(),
-  "attendanceCount": zod.number().int().optional()
+  "attendanceCount": zod.number().int().optional(),
+  "lessonPlan": zod.string().nullish()
 })
 
 
@@ -489,5 +532,19 @@ export const RequestUploadUrlResponse = zod.object({
   "uploadURL": zod.string().url(),
   "objectPath": zod.string()
 })
+
+
+/**
+ * @summary Download notes or stream a recording with HTTP Range support
+ */
+export const DownloadStoredObjectParams = zod.object({
+  "objectPath": zod.coerce.string()
+})
+
+export const DownloadStoredObjectHeader = zod.object({
+  "Range": zod.string().optional()
+})
+
+export const DownloadStoredObjectResponse = zod.unknown()
 
 

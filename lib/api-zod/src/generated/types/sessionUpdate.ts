@@ -12,11 +12,13 @@ export interface SessionUpdate {
   title?: string;
   startsAt?: Date;
   /**
-     * @minimum 15
-     * @maximum 180
+     * @minimum 60
+     * @maximum 60
      */
   durationMinutes?: number;
   status?: SessionUpdateStatus;
   /** @nullable */
   meetingUrl?: string | null;
+  /** @nullable */
+  lessonPlan?: string | null;
 }

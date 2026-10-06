@@ -97,6 +97,24 @@ export interface Course {
   scheduleSummary?: string | null;
 }
 
+export interface CourseInput {
+  subjectId: string;
+  /** @minLength 2 */
+  title: string;
+  /**
+     * @minimum 8
+     * @maximum 12
+     */
+  gradeMin: number;
+  /**
+     * @minimum 8
+     * @maximum 12
+     */
+  gradeMax: number;
+  /** @nullable */
+  scheduleSummary?: string | null;
+}
+
 export interface Learner {
   id: string;
   name: string;
@@ -169,10 +187,16 @@ export type EnrollmentUpdateAction = typeof EnrollmentUpdateAction[keyof typeof 
 export const EnrollmentUpdateAction = {
   cancel: 'cancel',
   resume: 'resume',
+  change: 'change',
 } as const;
 
 export interface EnrollmentUpdate {
   action: EnrollmentUpdateAction;
+  /**
+     * @minItems 1
+     * @maxItems 2
+     */
+  subjectIds?: string[];
 }
 
 export type ClassSessionStatus = typeof ClassSessionStatus[keyof typeof ClassSessionStatus];
@@ -198,6 +222,8 @@ export interface ClassSession {
   meetingUrl?: string | null;
   tutorName: string;
   attendanceCount?: number;
+  /** @nullable */
+  lessonPlan?: string | null;
 }
 
 export interface SessionInput {
@@ -206,12 +232,14 @@ export interface SessionInput {
   title: string;
   startsAt: string;
   /**
-     * @minimum 15
-     * @maximum 180
+     * @minimum 60
+     * @maximum 60
      */
   durationMinutes: number;
   /** @nullable */
   meetingUrl?: string | null;
+  /** @nullable */
+  lessonPlan?: string | null;
 }
 
 export type SessionUpdateStatus = typeof SessionUpdateStatus[keyof typeof SessionUpdateStatus];
@@ -229,13 +257,15 @@ export interface SessionUpdate {
   title?: string;
   startsAt?: string;
   /**
-     * @minimum 15
-     * @maximum 180
+     * @minimum 60
+     * @maximum 60
      */
   durationMinutes?: number;
   status?: SessionUpdateStatus;
   /** @nullable */
   meetingUrl?: string | null;
+  /** @nullable */
+  lessonPlan?: string | null;
 }
 
 export interface Material {

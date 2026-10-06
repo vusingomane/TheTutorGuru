@@ -1,0 +1,1 @@
+- [Source product requirements](source-product-requirements.md) — subject eligibility, pricing, class frequency, refund policy, and the requested architecture from the build brief.

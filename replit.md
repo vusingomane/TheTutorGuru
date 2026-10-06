@@ -1,6 +1,6 @@
-# [Project name]
+# TheTutorGuru
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A South African high-school tutoring platform for parents, learners, and tutors.
 
 ## Run & Operate
 
@@ -22,15 +22,27 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Web app: `artifacts/the-tutor-guru`; frontend routes are in `src/pages`.
+- API contract: `lib/api-spec/openapi.yaml`; regenerate clients after any contract change.
+- Database schema: `lib/db/src/schema/tutoring.ts`.
+- Domain routes: `artifacts/api-server/src/routes/accounts.ts`, `classes.ts`, and `resources.ts`.
+- Clerk and App Storage are provisioned; their secrets must never be exposed.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- This first runnable MVP uses the provided React/Express scaffold. The source brief's .NET Minimal API, MudBlazor, Dapper, and ASP.NET Core Identity architecture is not delivered by this implementation and must not be described as fulfilled.
+- Account roles are chosen at onboarding and cannot be changed by profile edits. Tutors manage only their own courses.
+- A learner is linked to a parent's learner record through the authenticated account's primary email address. Course access requires a paid enrolment with an unexpired billing period, or tutor ownership.
+- Uploads go directly to private App Storage. The server verifies upload ownership and metadata before attaching files; file delivery checks course access and supports byte ranges for recordings.
+- No payment provider is connected. Requests remain pending and grant no lesson access. Paid billing changes are blocked rather than pretending to cancel an external recurring charge.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Public subject and pricing information, branded sign-in/sign-up, and role onboarding.
+- Parent learner management and pending subscription requests.
+- Tutor course creation, one-hour class scheduling, lesson plans, attendance, notes, and recording uploads.
+- Protected learner materials, live meeting links, MP4 playback, and attendance-based progress reports.
+- Teams/Zoom meeting links are entered manually. Meeting creation and automated recording retrieval are not integrated.
 
 ## User preferences
 
@@ -38,7 +50,11 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run `pnpm --filter @workspace/api-spec run codegen` after contract changes.
+- Use the existing artifact-managed workflows; do not start replacement dev servers.
+- Apply development schema changes with the DB package's push script; never perform startup-time DDL.
+- Catalogue seed courses belong to a system catalogue profile, not to a signed-in tutor. New tutors create their own courses.
+- The first build has static/type checks and a public preview check, but no automated signed-in browser pass.
 
 ## Pointers
 

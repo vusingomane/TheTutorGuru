@@ -12,4 +12,5 @@ export type EnrollmentUpdateAction = typeof EnrollmentUpdateAction[keyof typeof 
 export const EnrollmentUpdateAction = {
   cancel: 'cancel',
   resume: 'resume',
+  change: 'change',
 } as const;

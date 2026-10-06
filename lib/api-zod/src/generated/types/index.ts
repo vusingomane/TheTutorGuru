@@ -12,6 +12,7 @@ export * from './attendanceInput';
 export * from './classSession';
 export * from './classSessionStatus';
 export * from './course';
+export * from './courseInput';
 export * from './enrollment';
 export * from './enrollmentInput';
 export * from './enrollmentPaymentStatus';

@@ -86,6 +86,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/Overview"
   /courses:
+    post:
+      operationId: createCourse
+      tags: [tutoring]
+      summary: Create a course owned by the current tutor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "201":
+          description: Course created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
     get:
       operationId: listCourses
       tags: [tutoring]
@@ -409,6 +426,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadUrl"
+  /storage/objects/{objectPath}:
+    get:
+      operationId: downloadStoredObject
+      tags: [storage]
+      summary: Download notes or stream a recording with HTTP Range support
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema: { type: string }
+        - name: Range
+          in: header
+          schema: { type: string }
+      responses:
+        "200":
+          description: Authorized file content
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "206":
+          description: Requested byte range
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403":
+          description: The current user cannot access this course file
+        "416":
+          description: Invalid byte range
 components:
   schemas:
     HealthStatus:
@@ -479,6 +524,15 @@ components:
         gradeMax: { type: integer }
         tutorName: { type: string }
         scheduleSummary: { type: ["string", "null"] }
+    CourseInput:
+      type: object
+      required: [subjectId, title, gradeMin, gradeMax]
+      properties:
+        subjectId: { type: string }
+        title: { type: string, minLength: 2 }
+        gradeMin: { type: integer, minimum: 8, maximum: 12 }
+        gradeMax: { type: integer, minimum: 8, maximum: 12 }
+        scheduleSummary: { type: ["string", "null"] }
     Learner:
       type: object
       required: [id, name, grade, email, createdAt]
@@ -525,7 +579,12 @@ components:
       type: object
       required: [action]
       properties:
-        action: { type: string, enum: [cancel, resume] }
+        action: { type: string, enum: [cancel, resume, change] }
+        subjectIds:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items: { type: string }
     ClassSession:
       type: object
       required: [id, courseId, courseTitle, subjectName, title, startsAt, durationMinutes, status, tutorName]
@@ -541,6 +600,7 @@ components:
         meetingUrl: { type: ["string", "null"], format: uri }
         tutorName: { type: string }
         attendanceCount: { type: integer }
+        lessonPlan: { type: ["string", "null"] }
     SessionInput:
       type: object
       required: [courseId, title, startsAt, durationMinutes]
@@ -548,16 +608,18 @@ components:
         courseId: { type: string }
         title: { type: string, minLength: 2 }
         startsAt: { type: string, format: date-time }
-        durationMinutes: { type: integer, minimum: 15, maximum: 180 }
+        durationMinutes: { type: integer, minimum: 60, maximum: 60 }
         meetingUrl: { type: ["string", "null"], format: uri }
+        lessonPlan: { type: ["string", "null"] }
     SessionUpdate:
       type: object
       properties:
         title: { type: string, minLength: 2 }
         startsAt: { type: string, format: date-time }
-        durationMinutes: { type: integer, minimum: 15, maximum: 180 }
+        durationMinutes: { type: integer, minimum: 60, maximum: 60 }
         status: { type: string, enum: [scheduled, live, completed, cancelled] }
         meetingUrl: { type: ["string", "null"], format: uri }
+        lessonPlan: { type: ["string", "null"] }
     Material:
       type: object
       required: [id, courseId, courseTitle, title, originalFileName, objectPath, contentType, sizeBytes, uploadedAt]

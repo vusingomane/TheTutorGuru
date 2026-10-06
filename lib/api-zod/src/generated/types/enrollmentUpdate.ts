@@ -9,4 +9,9 @@ import type { EnrollmentUpdateAction } from './enrollmentUpdateAction';
 
 export interface EnrollmentUpdate {
   action: EnrollmentUpdateAction;
+  /**
+     * @minItems 1
+     * @maxItems 2
+     */
+  subjectIds?: string[];
 }
