@@ -4,5 +4,8 @@
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Npgsql" Version="10.0.0" />
   </ItemGroup>
-  <ItemGroup><Content Include="Data/identity.sql" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup>
+    <Content Include="Data/identity.sql" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Data/billing.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

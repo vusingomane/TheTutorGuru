@@ -11,6 +11,7 @@
     "build:legacy": "node ./build.mjs",
     "start:legacy": "node --enable-source-maps ./dist/index.mjs",
     "test:migration": "node tests/architecture-migration.mjs",
+    "test:billing": "dotnet run --project tests/dotnet/BillingChecks.csproj --no-launch-profile",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

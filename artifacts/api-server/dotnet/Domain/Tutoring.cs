@@ -8,8 +8,11 @@ public sealed class HttpError(int status, string message) : Exception(message)
 {
     public int Status { get; } = status;
 }
-public sealed class Tutoring(Database db)
+public sealed class Tutoring(Database db, IHostEnvironment environment)
 {
+    // Development test payments must never grant access on a published production service.
+    public string PaymentEnvironmentFilter => environment.IsDevelopment() ? "" :
+        " AND NOT EXISTS (SELECT 1 FROM guru_billing_accounts b WHERE b.enrollment_id=e.id AND b.mode='sandbox')";
     public const string ProfileSelect = """SELECT id,full_name AS "fullName",email,role,phone,grade,created_at AS "createdAt" FROM guru_profiles""";
     public const string CourseSelect = """SELECT c.id,c.subject_id AS "subjectId",s.name AS "subjectName",c.title,c.grade_min AS "gradeMin",c.grade_max AS "gradeMax",p.full_name AS "tutorName",c.schedule_summary AS "scheduleSummary" FROM guru_courses c JOIN guru_subjects s ON s.id=c.subject_id JOIN guru_profiles p ON p.id=c.tutor_id""";
     public const string EnrollmentSelect = """SELECT e.id,e.learner_id AS "learnerId",l.name AS "learnerName",l.grade AS "learnerGrade",e.subject_ids AS "subjectIds",e.monthly_amount_zar AS "monthlyAmountZar",e.status,e.payment_status AS "paymentStatus",e.period_ends_at AS "periodEndsAt",e.created_at AS "createdAt" FROM guru_enrollments e JOIN guru_learners l ON l.id=e.learner_id""";
@@ -40,8 +43,7 @@ public sealed class Tutoring(Database db)
             JOIN guru_enrollments e ON c.subject_id=ANY(e.subject_ids)
             JOIN guru_learners l ON l.id=e.learner_id AND l.grade BETWEEN c.grade_min AND c.grade_max
             WHERE e.status IN ('active','cancelling') AND e.payment_status='paid' AND e.period_ends_at>now()
-            AND
-            """ + " " + (Role(c) == "parent" ? "e.parent_id=$1" : "lower(l.email)=lower($1)"), Role(c) == "parent" ? Id(c) : p["email"]);
+            """ + PaymentEnvironmentFilter + " AND " + (Role(c) == "parent" ? "e.parent_id=$1" : "lower(l.email)=lower($1)"), Role(c) == "parent" ? Id(c) : p["email"]);
         return rows.Select(r => (Guid)r["id"]!).ToArray();
     }
     public async Task<IDictionary<string, object?>> Owner(HttpContext c, Guid courseId)
@@ -58,7 +60,7 @@ public sealed class Tutoring(Database db)
             FROM guru_learners l JOIN guru_enrollments e ON e.learner_id=l.id
             JOIN guru_courses c ON c.subject_id=ANY(e.subject_ids) AND l.grade BETWEEN c.grade_min AND c.grade_max
             WHERE c.tutor_id=$1 AND e.payment_status='paid' AND e.status IN ('active','cancelling') AND e.period_ends_at>now()
-            """, Id(c));
+            """ + PaymentEnvironmentFilter, Id(c));
     }
     public async Task ValidateSubjects(string[]? ids, int grade)
     {

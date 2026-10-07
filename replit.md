@@ -9,6 +9,7 @@ A South African high-school tutoring platform for parents, learners, and tutors.
 - `pnpm run typecheck` — retained TypeScript source checks (not .NET validation)
 - `pnpm run build` — TypeScript check + .NET publish and other workspace builds
 - `pnpm --filter @workspace/api-server run test:migration` — isolated development API/ownership/access checks
+- `pnpm --filter @workspace/api-server run test:billing` — isolated billing ledger/rule/access checks with HTTP fixtures; no external charges
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - Identity schema is applied explicitly by the .NET operator migration tool; see `docs/architecture-migration.md`. Do not push the archived Drizzle schema over Identity tables.
 - Required env: `DATABASE_URL` and a stable `SESSION_SECRET` (32+ characters) protecting persisted Identity keys; never replace the latter casually.
@@ -38,7 +39,8 @@ A South African high-school tutoring platform for parents, learners, and tutors.
 - Account roles are chosen at onboarding and cannot be changed by profile edits. Tutors manage only their own courses.
 - A learner is linked to a parent's learner record through the authenticated account's primary email address. Course access requires a paid enrolment with an unexpired billing period, or tutor ownership.
 - Uploads go directly to private App Storage. The server verifies upload ownership and metadata before attaching files; file delivery checks course access and supports byte ranges for recordings.
-- No payment provider is connected. Requests remain pending and grant no lesson access. Paid billing changes are blocked rather than pretending to cancel an external recurring charge.
+- PayGate was selected because the user has a PayGate account. Billing uses PayWeb3/PayVault checkout and PayHost renewals/refunds, with an app-controlled schedule. The user requested the mock account: development explicitly uses PayGate's public sandbox preset, never live credentials or real funds. Production still defaults to disabled; see `docs/paygate-billing.md`.
+- Billing schema changes are explicitly additive (`--migrate-billing`), not startup DDL. Never manually toggle a subscription to paid. Unknown charge/refund outcomes must be reconciled, not blindly retried.
 
 ## Product
 

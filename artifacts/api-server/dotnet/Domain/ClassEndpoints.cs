@@ -52,7 +52,7 @@ public static class ClassEndpoints
         {
             var ss = await db.One("SELECT course_id FROM guru_sessions WHERE id=$1", sessionId) ?? throw new HttpError(404, "Session not found.");
             var course = await domain.Owner(c, (Guid)ss["course_id"]!);
-            if (await db.One("SELECT l.id FROM guru_learners l JOIN guru_enrollments e ON e.learner_id=l.id WHERE l.id=$1 AND $2=ANY(e.subject_ids) AND l.grade BETWEEN $3 AND $4 AND e.payment_status='paid' AND e.status IN ('active','cancelling') AND e.period_ends_at>now()", learnerId, course["subject_id"], course["grade_min"], course["grade_max"]) is null)
+            if (await db.One("SELECT l.id FROM guru_learners l JOIN guru_enrollments e ON e.learner_id=l.id WHERE l.id=$1 AND $2=ANY(e.subject_ids) AND l.grade BETWEEN $3 AND $4 AND e.payment_status='paid' AND e.status IN ('active','cancelling') AND e.period_ends_at>now()" + domain.PaymentEnvironmentFilter, learnerId, course["subject_id"], course["grade_min"], course["grade_max"]) is null)
                 throw new HttpError(403, "This learner is not enrolled in this course.");
             return Results.Json(await db.One("""INSERT INTO guru_attendance(session_id,learner_id,attended) VALUES($1,$2,$3) ON CONFLICT(session_id,learner_id) DO UPDATE SET attended=EXCLUDED.attended,marked_at=now() RETURNING session_id AS "sessionId",learner_id AS "learnerId",attended,marked_at AS "markedAt" """, sessionId, learnerId, body.Attended));
         });

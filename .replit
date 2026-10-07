@@ -56,3 +56,12 @@ timeoutMs = 180000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.development]
+PAYGATE_APP_ORIGIN = "https://9061e3b4-1d46-429f-b54d-a1f33f64f74b-00-3ixnok1yoozm-8kl1kc73.kirk.replit.dev"
+PAYGATE_MODE = "sandbox"
+PAYGATE_PUBLIC_SANDBOX = "true"
+PAYGATE_RECURRING_ENABLED = "true"
+PAYGATE_PUBLIC_SANDBOX_ACCOUNT = "10011064270"

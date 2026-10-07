@@ -9,6 +9,7 @@ using TutorGuru.Api;
 using TutorGuru.Api.Data;
 using TutorGuru.Api.Identity;
 using TutorGuru.Api.Storage;
+using TutorGuru.Api.Billing;
 
 var db = new Database();
 if (args.Length > 0 && args[0].StartsWith("--") && !args[0].StartsWith("--urls"))
@@ -24,6 +25,12 @@ builder.Services.AddSingleton(db);
 builder.Services.AddScoped<Tutoring>();
 builder.Services.AddScoped<ObjectStorage>();
 builder.Services.AddScoped<MailService>();
+builder.Services.AddSingleton<PayGateOptions>();
+builder.Services.AddScoped<PayGateClient>();
+builder.Services.AddScoped<BillingService>();
+builder.Services.AddHostedService<BillingWorker>();
+builder.Services.AddHttpClient("paygate", c => c.Timeout = TimeSpan.FromSeconds(30))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHttpClient("sign", c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient("stream", c => c.Timeout = Timeout.InfiniteTimeSpan);
 builder.Services.AddIdentityCore<IdentityUser>(options =>
@@ -102,14 +109,15 @@ app.UseAuthorization();
 app.UseRateLimiter();
 app.Use(async (c, next) =>
 {
-    if (!HttpMethods.IsGet(c.Request.Method) && !HttpMethods.IsHead(c.Request.Method))
+    var providerPath = BillingEndpoints.ProviderPath(c.Request.Path);
+    if (!providerPath && !HttpMethods.IsGet(c.Request.Method) && !HttpMethods.IsHead(c.Request.Method))
     {
         try { await c.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(c); }
         catch (AntiforgeryValidationException) { throw new HttpError(400, "This secure request expired. Refresh the page and try again."); }
     }
     var path = c.Request.Path.Value ?? "";
-    if (path.StartsWith("/api/") && !path.StartsWith("/api/auth/") && path is not "/api/healthz" &&
-        !(HttpMethods.IsGet(c.Request.Method) && path is "/api/subjects" or "/api/courses"))
+    if (!providerPath && path.StartsWith("/api/") && !path.StartsWith("/api/auth/") && path is not "/api/healthz" &&
+        !(HttpMethods.IsGet(c.Request.Method) && path is "/api/subjects" or "/api/courses" or "/api/billing/config"))
         await c.RequestServices.GetRequiredService<Tutoring>().Load(c, !path.Equals("/api/profile"));
     c.Response.Headers.XContentTypeOptions = "nosniff";
     if (path != "/api/subjects" && path != "/api/courses" && path != "/api/auth/csrf") c.Response.Headers.CacheControl = "private, no-store";
@@ -120,4 +128,5 @@ app.MapAuth();
 app.MapAccounts();
 app.MapClasses();
 app.MapResources();
+app.MapBilling();
 app.Run();

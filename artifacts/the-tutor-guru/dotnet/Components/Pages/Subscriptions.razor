@@ -2,7 +2,21 @@
 @inherits GuruPage
 
 <Frame Title="Subscriptions" Subtitle="R290 per month for one subject, R495 for two. Full refund within 30 days." Loading="Loading" Error="@LoadError" OnRetry="Reload">
-    <MudAlert Severity="Severity.Info" Class="mb-4">Payments are not enabled yet. A new subscription stays pending and grants no class content until payment is confirmed.</MudAlert>
+    <MudAlert Severity="@(_config.B("enabled") ? Severity.Info : Severity.Warning)" Class="mb-4">@_config.S("message")</MudAlert>
+    @if (_checkout != null)
+    {
+        <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border:1px solid #ddd3bd">
+            <MudText Typo="Typo.subtitle1">Your PayGate checkout is ready</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">PayGate opens in a new tab. After payment, return here and select “Refresh payment status”. Opening checkout does not grant lesson access.</MudText>
+            <form method="post" action="@_checkout.S("actionUrl")" target="_blank" rel="noopener">
+                @foreach (var field in _checkout["fields"]!.AsObject())
+                {
+                    <input type="hidden" name="@field.Key" value="@field.Value?.ToString()" />
+                }
+                <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">Continue to secure PayGate payment</MudButton>
+            </form>
+        </MudPaper>
+    }
     @if (!IsParent) { <Empty Icon="@Icons.Material.Filled.Lock" Title="Parents manage subscriptions" Text="Ask your parent to subscribe on your behalf." /> }
     else
     {
@@ -13,6 +27,10 @@
                 <MudSelect T="string" @bind-Value="_learner" Label="Learner" Variant="Variant.Outlined" Class="mb-3">@foreach (var l in _learners) { <MudSelectItem T="string" Value="@l.S("id")">@l.S("name") (Grade @l.I("grade"))</MudSelectItem> }</MudSelect>
             }
             <MudText Typo="Typo.body2">Pick one or two subjects.</MudText>
+            @if (_editing?.S("paymentStatus") == "paid")
+            {
+                <MudAlert Severity="Severity.Info" Class="my-2">The selected subjects and their monthly price will apply at your next successful renewal. Your currently paid subjects stay available until then.</MudAlert>
+            }
             @foreach (var s in EligibleSubjects())
             {
                 var id = s.S("id");
@@ -30,6 +48,8 @@
         @foreach (var e in _subs)
         {
             var st = e.S("status");
+            var bill = _billing.GetValueOrDefault(e.S("id"));
+            var unresolved = bill.B("hasUnresolvedPayment");
             <MudPaper Elevation="0" Class="pa-4 mb-3" Style="border:1px solid #ddd3bd">
                 <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
                     <div>
@@ -39,28 +59,84 @@
                             <MudChip T="string" Size="Size.Small" Color="@StatusColor(st)">@st</MudChip>
                             <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">payment: @e.S("paymentStatus").Replace('_', ' ')</MudChip>
                         </MudStack>
+                        @if (!string.IsNullOrEmpty(e.S("periodEndsAt")))
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-2">Paid period ends: @J.Date(e.S("periodEndsAt"))</MudText>
+                        }
+                        @if (IsParent)
+                        {
+                            <MudText Typo="Typo.body2">Automatic renewal: @(bill.B("autoRenew") ? "on" : "off")</MudText>
+                            @if (bill.L("pendingSubjectIds").Count > 0)
+                            {
+                                <MudText Typo="Typo.body2">Next renewal: @string.Join(", ", bill.L("pendingSubjectIds").Select(s => SubjectName(s.ToString()))) — R@(bill.L("pendingSubjectIds").Count == 1 ? 290 : 495)/month</MudText>
+                            }
+                            @if (unresolved) { <MudText Color="Color.Warning" Typo="Typo.body2">Payment confirmation is pending. Refresh status before making another billing change.</MudText> }
+                            @if (st == "past_due") { <MudText Color="Color.Error" Typo="Typo.body2">Payment failed or your paid period expired. Renewals are stopped; pay securely to restore access.</MudText> }
+                        }
                     </div>
                     @if (IsParent)
                     {
-                        <MudStack Row Spacing="1">
-                            @if (st != "cancelled" && st != "cancelling") { <MudButton Variant="Variant.Outlined" OnClick="() => StartEdit(e)">Change subjects</MudButton> <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick='() => Act(e, "cancel")'>Cancel</MudButton> }
-                            @if (st == "cancelling") { <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick='() => Act(e, "resume")'>Resume</MudButton> }
+                        <MudStack Row Spacing="1" Wrap="Wrap.Wrap">
+                            @if (st != "cancelled")
+                            {
+                                <MudButton Variant="Variant.Outlined" Disabled="_busy || unresolved" OnClick="() => StartEdit(e)">Change subjects</MudButton>
+                                @if (st != "cancelling") { <MudButton Color="Color.Error" Variant="Variant.Outlined" Disabled="_busy || unresolved" OnClick='() => Act(e, "cancel")'>Cancel</MudButton> }
+                            }
+                            @if (st == "cancelling") { <MudButton Color="Color.Primary" Variant="Variant.Outlined" Disabled="@(_busy || unresolved || !BillingEnabled)" OnClick='() => Act(e, "resume")'>Resume</MudButton> }
+                            <MudButton Variant="Variant.Outlined" Disabled="@(_busy || !BillingEnabled)" OnClick="() => RefreshPayment(e)">Refresh payment status</MudButton>
+                            @if (bill.L("payments").Any(p => p.S("kind") == "checkout" && p.S("state") == "pending"))
+                            {
+                                <MudButton Variant="Variant.Outlined" Disabled="@(_busy || !BillingEnabled)" OnClick="() => Reopen(e)">Reopen checkout</MudButton>
+                            }
                         </MudStack>
                     }
                 </MudStack>
+                @if (IsParent && st != "cancelled" && e.S("paymentStatus") != "paid" && !unresolved)
+                {
+                    var enrollmentId = e.S("id");
+                    <MudCheckBox T="bool" Value="_consents.Contains(enrollmentId)" ValueChanged="v => Consent(enrollmentId, v)"
+                        Label="I authorise PayGate to save my card securely and charge the displayed monthly subscription price until I cancel." />
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_busy || !BillingEnabled || !_consents.Contains(enrollmentId))" OnClick="() => Pay(e)">Prepare secure checkout</MudButton>
+                }
+                @if (IsParent && bill.L("payments").Count > 0)
+                {
+                    <MudDivider Class="my-3" />
+                    <MudText Typo="Typo.subtitle2">Payment history</MudText>
+                    @foreach (var p in bill.L("payments"))
+                    {
+                        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="my-1">
+                            <MudText Typo="Typo.body2">@J.Date(p.S("createdAt")) — @p.S("kind"): R@((p.I("amountCents") / 100m).ToString("0.00")) — @p.S("state")</MudText>
+                            @if (p.B("canRefund"))
+                            {
+                                <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined" Disabled="@(_busy || !BillingEnabled)" OnClick="() => Refund(e, p)">Full refund</MudButton>
+                            }
+                        </MudStack>
+                    }
+                    <MudText Typo="Typo.caption">Refunds are available within 30 days of confirmed payment. A confirmed refund ends access and stops renewals; bank processing may take additional time.</MudText>
+                }
             </MudPaper>
         }
     }
 </Frame>
 
 @code {
-    List<JsonNode> _subs = new(), _learners = new(), _subjects = new(); HashSet<string> _picked = new(); string _learner = ""; JsonNode? _editing; bool _busy;
+    List<JsonNode> _subs = new(), _learners = new(), _subjects = new();
+    HashSet<string> _picked = new(), _consents = new(); string _learner = "";
+    JsonNode? _editing, _config, _checkout; bool _busy;
+    Dictionary<string, JsonNode?> _billing = new();
+    Dictionary<string, Guid> _checkoutKeys = new(), _refundKeys = new();
+    bool BillingEnabled => _config.B("enabled");
     Color StatusColor(string s) => s switch { "active" => Color.Success, "pending" => Color.Warning, "cancelling" => Color.Tertiary, _ => Color.Default };
     string SubjectName(string id) => _subjects.FirstOrDefault(s => s.S("id") == id)?.S("name") ?? id;
     protected override async Task Load()
     {
         _subjects = (await Api.Send("/subjects")).L(); _subs = (await Api.Send("/enrollments")).L();
-        if (IsParent) _learners = (await Api.Send("/learners")).L();
+        _config = await Api.Send("/billing/config");
+        if (IsParent)
+        {
+            _learners = (await Api.Send("/learners")).L();
+            foreach (var e in _subs) _billing[e.S("id")] = await Api.Send($"/enrollments/{e.S("id")}/billing");
+        }
     }
     IEnumerable<JsonNode> EligibleSubjects()
     {
@@ -68,7 +144,12 @@
         return _subjects.Where(s => gradeStr == 0 || s.L("grades").Any(g => g.GetValue<int>() == gradeStr));
     }
     void Toggle(string id, bool on) { if (on) { if (_picked.Count >= 2) { Snack.Add("A subscription covers at most two subjects.", Severity.Warning); return; } _picked.Add(id); } else _picked.Remove(id); }
-    void StartEdit(JsonNode e) { _editing = e; _picked = e.L("subjectIds").Select(x => x.ToString()).ToHashSet(); }
+    void StartEdit(JsonNode e)
+    {
+        _editing = e;
+        var scheduled = _billing.GetValueOrDefault(e.S("id")).L("pendingSubjectIds");
+        _picked = (scheduled.Count > 0 ? scheduled : e.L("subjectIds")).Select(x => x.ToString()).ToHashSet();
+    }
     void CancelEdit() { _editing = null; _picked.Clear(); }
     async Task Save()
     {
@@ -77,13 +158,63 @@
         _busy = true;
         var ok = _editing == null
             ? await Run(async () => await Api.Send("/enrollments", "POST", new { learnerId = _learner, subjectIds = _picked.ToArray() }), "Pending subscription created.")
-            : await Run(async () => await Api.Send($"/enrollments/{_editing.S("id")}", "PATCH", new { action = "change", subjectIds = _picked.ToArray() }), "Subjects updated.");
+            : await Run(async () => await Api.Send($"/enrollments/{_editing.S("id")}", "PATCH", new { action = "change", subjectIds = _picked.ToArray() }), _editing.S("paymentStatus") == "paid" ? "Subjects scheduled for the next renewal." : "Subjects updated.");
         if (ok) { CancelEdit(); await Reload(); }
         _busy = false;
     }
     async Task Act(JsonNode e, string action)
     {
-        if (action == "cancel" && !await Confirm("Cancel subscription", "Cancel this subscription? Refund terms apply within 30 days.")) return;
-        if (await Run(async () => await Api.Send($"/enrollments/{e.S("id")}", "PATCH", new { action }), action == "cancel" ? "Cancellation recorded." : "Subscription resumed.")) await Reload();
+        if (_busy) return;
+        if (action == "cancel" && !await Confirm("Cancel subscription", "Stop future monthly charges? Paid access continues to the end of the billing period. A refund is a separate action.")) return;
+        _busy = true;
+        try { if (await Run(async () => await Api.Send($"/enrollments/{e.S("id")}", "PATCH", new { action }), action == "cancel" ? "Future renewals stopped." : "Subscription resumed.")) await Reload(); }
+        finally { _busy = false; }
+    }
+    void Consent(string id, bool enabled) { if (enabled) _consents.Add(id); else _consents.Remove(id); }
+    async Task Pay(JsonNode e)
+    {
+        if (_busy) return;
+        var id = e.S("id");
+        if (!_checkoutKeys.TryGetValue(id, out var key)) _checkoutKeys[id] = key = Guid.NewGuid();
+        _busy = true;
+        try
+        {
+            await Run(async () => _checkout = await Api.Send($"/enrollments/{id}/checkout", "POST", new { idempotencyKey = key, recurringConsent = _consents.Contains(id) }));
+            await Reload();
+        }
+        finally { _busy = false; }
+    }
+    async Task RefreshPayment(JsonNode e)
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            await Run(async () => await Api.Send($"/enrollments/{e.S("id")}/reconcile", "POST"), "Payment status refreshed.");
+            _checkout = null; _checkoutKeys.Remove(e.S("id"));
+            await Reload();
+        }
+        finally { _busy = false; }
+    }
+    async Task Reopen(JsonNode e)
+    {
+        if (_busy) return;
+        _busy = true;
+        try { await Run(async () => _checkout = await Api.Send($"/enrollments/{e.S("id")}/checkout")); }
+        finally { _busy = false; }
+    }
+    async Task Refund(JsonNode e, JsonNode p)
+    {
+        if (_busy || !await Confirm("Request full refund", "Refund this payment in full and stop future renewals? Confirmed refunds end subscription access.")) return;
+        var paymentId = p.S("id");
+        if (!_refundKeys.TryGetValue(paymentId, out var key)) _refundKeys[paymentId] = key = Guid.NewGuid();
+        _busy = true;
+        try
+        {
+            await Run(async () => await Api.Send($"/enrollments/{e.S("id")}/refunds", "POST", new { paymentId, idempotencyKey = key }), "Refund request recorded. Check its status in payment history.");
+            await Reload();
+            if (!_billing.GetValueOrDefault(e.S("id")).B("hasUnresolvedPayment")) _refundKeys.Remove(paymentId);
+        }
+        finally { _busy = false; }
     }
 }

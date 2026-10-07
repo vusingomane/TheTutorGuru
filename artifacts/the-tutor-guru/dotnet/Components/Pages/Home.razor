@@ -56,17 +56,25 @@
         }
         </MudGrid>
     }
-    <MudAlert Severity="Severity.Normal" Class="mt-8" Icon="@Icons.Material.Filled.Info">Online payments are not enabled yet. New subscriptions stay pending and do not grant class content until payment is confirmed.</MudAlert>
+    @if (_billing != null)
+    {
+        <MudAlert Severity="Severity.Normal" Class="mt-8" Icon="@Icons.Material.Filled.Info">@_billing.S("message")</MudAlert>
+    }
 </MudContainer>
 
 @code {
-    List<JsonNode>? _subjects; string? _error;
+    List<JsonNode>? _subjects; JsonNode? _billing; string? _error;
     internal static string GradeRange(JsonNode s) { var g = s.L("grades").Select(x => x.GetValue<int>()).OrderBy(x => x).ToList(); return g.Count == 0 ? "" : $"{g.First()} to {g.Last()}"; }
     protected override async Task OnAfterRenderAsync(bool first) { if (first) await Load(); }
     async Task Load()
     {
         _error = null;
-        try { _subjects = (await Api.Send("/subjects")).L(); } catch (Exception e) { _error = e.Message; }
+        try
+        {
+            _subjects = (await Api.Send("/subjects")).L();
+            _billing = await Api.Send("/billing/config");
+        }
+        catch (Exception e) { _error = e.Message; }
         StateHasChanged();
     }
 }

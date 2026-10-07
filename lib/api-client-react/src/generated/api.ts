@@ -22,10 +22,14 @@ import type {
 import type {
   Attendance,
   AttendanceInput,
+  BillingCheckout,
+  BillingConfig,
+  CheckoutInput,
   ClassSession,
   Course,
   CourseInput,
   Enrollment,
+  EnrollmentBilling,
   EnrollmentInput,
   EnrollmentUpdate,
   HealthStatus,
@@ -38,11 +42,13 @@ import type {
   Material,
   MaterialInput,
   Overview,
+  PayGateNotification,
   Profile,
   ProfileInput,
   ProgressReport,
   Recording,
   RecordingInput,
+  RefundInput,
   SessionInput,
   SessionUpdate,
   Subject,
@@ -898,6 +904,698 @@ export const useUpdateEnrollment = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateEnrollmentMutationOptions(options));
+    }
+
+export const getGetBillingConfigUrl = () => {
+
+
+
+
+  return `/api/billing/config`
+}
+
+/**
+ * @summary Public payment provider readiness (never returns credentials)
+ */
+export const getBillingConfig = async ( options?: Parameters<typeof customFetch>[1]): Promise<BillingConfig> => {
+
+  return customFetch<BillingConfig>(getGetBillingConfigUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBillingConfigQueryKey = () => {
+    return [
+    `/api/billing/config`
+    ] as const;
+    }
+
+
+export const getGetBillingConfigQueryOptions = <TData = Awaited<ReturnType<typeof getBillingConfig>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillingConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBillingConfigQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBillingConfig>>> = ({ signal }) => getBillingConfig({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBillingConfig>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBillingConfigQueryResult = NonNullable<Awaited<ReturnType<typeof getBillingConfig>>>
+export type GetBillingConfigQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Public payment provider readiness (never returns credentials)
+ */
+
+export function useGetBillingConfig<TData = Awaited<ReturnType<typeof getBillingConfig>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBillingConfig>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBillingConfigQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRecoverEnrollmentCheckoutUrl = (enrollmentId: string,) => {
+
+
+
+
+  return `/api/enrollments/${enrollmentId}/checkout`
+}
+
+/**
+ * @summary Reopen an existing pending checkout after navigation; never creates a new charge
+ */
+export const recoverEnrollmentCheckout = async (enrollmentId: string, options?: Parameters<typeof customFetch>[1]): Promise<BillingCheckout> => {
+
+  return customFetch<BillingCheckout>(getRecoverEnrollmentCheckoutUrl(enrollmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getRecoverEnrollmentCheckoutQueryKey = (enrollmentId: string,) => {
+    return [
+    `/api/enrollments/${enrollmentId}/checkout`
+    ] as const;
+    }
+
+
+export const getRecoverEnrollmentCheckoutQueryOptions = <TData = Awaited<ReturnType<typeof recoverEnrollmentCheckout>>, TError = ErrorType<void>>(enrollmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof recoverEnrollmentCheckout>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getRecoverEnrollmentCheckoutQueryKey(enrollmentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof recoverEnrollmentCheckout>>> = ({ signal }) => recoverEnrollmentCheckout(enrollmentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: enrollmentId !== null && enrollmentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof recoverEnrollmentCheckout>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type RecoverEnrollmentCheckoutQueryResult = NonNullable<Awaited<ReturnType<typeof recoverEnrollmentCheckout>>>
+export type RecoverEnrollmentCheckoutQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reopen an existing pending checkout after navigation; never creates a new charge
+ */
+
+export function useRecoverEnrollmentCheckout<TData = Awaited<ReturnType<typeof recoverEnrollmentCheckout>>, TError = ErrorType<void>>(
+ enrollmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof recoverEnrollmentCheckout>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getRecoverEnrollmentCheckoutQueryOptions(enrollmentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getStartEnrollmentCheckoutUrl = (enrollmentId: string,) => {
+
+
+
+
+  return `/api/enrollments/${enrollmentId}/checkout`
+}
+
+/**
+ * @summary Start or reuse a PayGate hosted card checkout
+ */
+export const startEnrollmentCheckout = async (enrollmentId: string,
+    checkoutInput: CheckoutInput, options?: Parameters<typeof customFetch>[1]): Promise<BillingCheckout> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<BillingCheckout>(getStartEnrollmentCheckoutUrl(enrollmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(checkoutInput)
+  }
+);}
+
+
+
+
+
+export const getStartEnrollmentCheckoutMutationKey = () => ['startEnrollmentCheckout'] as const;
+
+export const getStartEnrollmentCheckoutMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startEnrollmentCheckout>>, TError,StartEnrollmentCheckoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startEnrollmentCheckout>>, TError,StartEnrollmentCheckoutMutationVariables, TContext> => {
+
+const mutationKey = getStartEnrollmentCheckoutMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startEnrollmentCheckout>>, StartEnrollmentCheckoutMutationVariables> = (props) => {
+          const {enrollmentId,data} = props ?? {};
+
+          return  startEnrollmentCheckout(enrollmentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartEnrollmentCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof startEnrollmentCheckout>>>
+    export type StartEnrollmentCheckoutMutationBody = BodyType<CheckoutInput>
+    export type StartEnrollmentCheckoutMutationError = ErrorType<void>
+    export type StartEnrollmentCheckoutMutationVariables = {enrollmentId: string;data: BodyType<CheckoutInput>}
+
+    /**
+ * @summary Start or reuse a PayGate hosted card checkout
+ */
+export const useStartEnrollmentCheckout = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startEnrollmentCheckout>>, TError,StartEnrollmentCheckoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startEnrollmentCheckout>>,
+        TError,
+        StartEnrollmentCheckoutMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStartEnrollmentCheckoutMutationOptions(options));
+    }
+
+export const getGetEnrollmentBillingUrl = (enrollmentId: string,) => {
+
+
+
+
+  return `/api/enrollments/${enrollmentId}/billing`
+}
+
+/**
+ * @summary Parent-owned payment history, renewal settings and refund eligibility
+ */
+export const getEnrollmentBilling = async (enrollmentId: string, options?: Parameters<typeof customFetch>[1]): Promise<EnrollmentBilling> => {
+
+  return customFetch<EnrollmentBilling>(getGetEnrollmentBillingUrl(enrollmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetEnrollmentBillingQueryKey = (enrollmentId: string,) => {
+    return [
+    `/api/enrollments/${enrollmentId}/billing`
+    ] as const;
+    }
+
+
+export const getGetEnrollmentBillingQueryOptions = <TData = Awaited<ReturnType<typeof getEnrollmentBilling>>, TError = ErrorType<unknown>>(enrollmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEnrollmentBilling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetEnrollmentBillingQueryKey(enrollmentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getEnrollmentBilling>>> = ({ signal }) => getEnrollmentBilling(enrollmentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: enrollmentId !== null && enrollmentId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getEnrollmentBilling>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetEnrollmentBillingQueryResult = NonNullable<Awaited<ReturnType<typeof getEnrollmentBilling>>>
+export type GetEnrollmentBillingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Parent-owned payment history, renewal settings and refund eligibility
+ */
+
+export function useGetEnrollmentBilling<TData = Awaited<ReturnType<typeof getEnrollmentBilling>>, TError = ErrorType<unknown>>(
+ enrollmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getEnrollmentBilling>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetEnrollmentBillingQueryOptions(enrollmentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getReconcileEnrollmentBillingUrl = (enrollmentId: string,) => {
+
+
+
+
+  return `/api/enrollments/${enrollmentId}/reconcile`
+}
+
+/**
+ * @summary Query PayGate for outstanding payments; does not initiate another charge
+ */
+export const reconcileEnrollmentBilling = async (enrollmentId: string, options?: Parameters<typeof customFetch>[1]): Promise<EnrollmentBilling> => {
+
+  return customFetch<EnrollmentBilling>(getReconcileEnrollmentBillingUrl(enrollmentId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReconcileEnrollmentBillingMutationKey = () => ['reconcileEnrollmentBilling'] as const;
+
+export const getReconcileEnrollmentBillingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconcileEnrollmentBilling>>, TError,ReconcileEnrollmentBillingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reconcileEnrollmentBilling>>, TError,ReconcileEnrollmentBillingMutationVariables, TContext> => {
+
+const mutationKey = getReconcileEnrollmentBillingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reconcileEnrollmentBilling>>, ReconcileEnrollmentBillingMutationVariables> = (props) => {
+          const {enrollmentId} = props ?? {};
+
+          return  reconcileEnrollmentBilling(enrollmentId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReconcileEnrollmentBillingMutationResult = NonNullable<Awaited<ReturnType<typeof reconcileEnrollmentBilling>>>
+
+    export type ReconcileEnrollmentBillingMutationError = ErrorType<void>
+    export type ReconcileEnrollmentBillingMutationVariables = {enrollmentId: string}
+
+    /**
+ * @summary Query PayGate for outstanding payments; does not initiate another charge
+ */
+export const useReconcileEnrollmentBilling = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reconcileEnrollmentBilling>>, TError,ReconcileEnrollmentBillingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reconcileEnrollmentBilling>>,
+        TError,
+        ReconcileEnrollmentBillingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReconcileEnrollmentBillingMutationOptions(options));
+    }
+
+export const getRefundEnrollmentPaymentUrl = (enrollmentId: string,) => {
+
+
+
+
+  return `/api/enrollments/${enrollmentId}/refunds`
+}
+
+/**
+ * @summary Request a full refund of a payment within 30 days and stop renewals
+ */
+export const refundEnrollmentPayment = async (enrollmentId: string,
+    refundInput: RefundInput, options?: Parameters<typeof customFetch>[1]): Promise<EnrollmentBilling> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<EnrollmentBilling>(getRefundEnrollmentPaymentUrl(enrollmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(refundInput)
+  }
+);}
+
+
+
+
+
+export const getRefundEnrollmentPaymentMutationKey = () => ['refundEnrollmentPayment'] as const;
+
+export const getRefundEnrollmentPaymentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refundEnrollmentPayment>>, TError,RefundEnrollmentPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof refundEnrollmentPayment>>, TError,RefundEnrollmentPaymentMutationVariables, TContext> => {
+
+const mutationKey = getRefundEnrollmentPaymentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof refundEnrollmentPayment>>, RefundEnrollmentPaymentMutationVariables> = (props) => {
+          const {enrollmentId,data} = props ?? {};
+
+          return  refundEnrollmentPayment(enrollmentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RefundEnrollmentPaymentMutationResult = NonNullable<Awaited<ReturnType<typeof refundEnrollmentPayment>>>
+    export type RefundEnrollmentPaymentMutationBody = BodyType<RefundInput>
+    export type RefundEnrollmentPaymentMutationError = ErrorType<void>
+    export type RefundEnrollmentPaymentMutationVariables = {enrollmentId: string;data: BodyType<RefundInput>}
+
+    /**
+ * @summary Request a full refund of a payment within 30 days and stop renewals
+ */
+export const useRefundEnrollmentPayment = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refundEnrollmentPayment>>, TError,RefundEnrollmentPaymentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof refundEnrollmentPayment>>,
+        TError,
+        RefundEnrollmentPaymentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRefundEnrollmentPaymentMutationOptions(options));
+    }
+
+export const getReceivePayGateNotificationUrl = () => {
+
+
+
+
+  return `/api/billing/paygate/notify`
+}
+
+/**
+ * @summary Provider-only callback authenticated by checksum and server-side query
+ */
+export const receivePayGateNotification = async (payGateNotification: PayGateNotification, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+    const formUrlEncoded = new URLSearchParams();
+formUrlEncoded.append(`PAYGATE_ID`, payGateNotification.PAYGATE_ID);
+formUrlEncoded.append(`PAY_REQUEST_ID`, payGateNotification.PAY_REQUEST_ID);
+formUrlEncoded.append(`REFERENCE`, payGateNotification.REFERENCE);
+formUrlEncoded.append(`TRANSACTION_STATUS`, payGateNotification.TRANSACTION_STATUS);
+if(payGateNotification.RESULT_CODE !== undefined) {
+ formUrlEncoded.append(`RESULT_CODE`, payGateNotification.RESULT_CODE);
+ }
+if(payGateNotification.AUTH_CODE !== undefined) {
+ formUrlEncoded.append(`AUTH_CODE`, payGateNotification.AUTH_CODE);
+ }
+formUrlEncoded.append(`CURRENCY`, payGateNotification.CURRENCY);
+formUrlEncoded.append(`AMOUNT`, payGateNotification.AMOUNT);
+if(payGateNotification.RESULT_DESC !== undefined) {
+ formUrlEncoded.append(`RESULT_DESC`, payGateNotification.RESULT_DESC);
+ }
+if(payGateNotification.TRANSACTION_ID !== undefined) {
+ formUrlEncoded.append(`TRANSACTION_ID`, payGateNotification.TRANSACTION_ID);
+ }
+if(payGateNotification.RISK_INDICATOR !== undefined) {
+ formUrlEncoded.append(`RISK_INDICATOR`, payGateNotification.RISK_INDICATOR);
+ }
+if(payGateNotification.PAY_METHOD !== undefined) {
+ formUrlEncoded.append(`PAY_METHOD`, payGateNotification.PAY_METHOD);
+ }
+if(payGateNotification.PAY_METHOD_DETAIL !== undefined) {
+ formUrlEncoded.append(`PAY_METHOD_DETAIL`, payGateNotification.PAY_METHOD_DETAIL);
+ }
+if(payGateNotification.USER1 !== undefined) {
+ formUrlEncoded.append(`USER1`, payGateNotification.USER1);
+ }
+if(payGateNotification.USER2 !== undefined) {
+ formUrlEncoded.append(`USER2`, payGateNotification.USER2);
+ }
+if(payGateNotification.USER3 !== undefined) {
+ formUrlEncoded.append(`USER3`, payGateNotification.USER3);
+ }
+if(payGateNotification.VAULT_ID !== undefined) {
+ formUrlEncoded.append(`VAULT_ID`, payGateNotification.VAULT_ID);
+ }
+if(payGateNotification.PAYVAULT_DATA_1 !== undefined) {
+ formUrlEncoded.append(`PAYVAULT_DATA_1`, payGateNotification.PAYVAULT_DATA_1);
+ }
+if(payGateNotification.PAYVAULT_DATA_2 !== undefined) {
+ formUrlEncoded.append(`PAYVAULT_DATA_2`, payGateNotification.PAYVAULT_DATA_2);
+ }
+formUrlEncoded.append(`CHECKSUM`, payGateNotification.CHECKSUM);
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<string>(getReceivePayGateNotificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getHeaders(options?.headers) },
+    body: formUrlEncoded
+  }
+);}
+
+
+
+
+
+export const getReceivePayGateNotificationMutationKey = () => ['receivePayGateNotification'] as const;
+
+export const getReceivePayGateNotificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receivePayGateNotification>>, TError,ReceivePayGateNotificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof receivePayGateNotification>>, TError,ReceivePayGateNotificationMutationVariables, TContext> => {
+
+const mutationKey = getReceivePayGateNotificationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof receivePayGateNotification>>, ReceivePayGateNotificationMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  receivePayGateNotification(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReceivePayGateNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof receivePayGateNotification>>>
+    export type ReceivePayGateNotificationMutationBody = BodyType<PayGateNotification>
+    export type ReceivePayGateNotificationMutationError = ErrorType<void>
+    export type ReceivePayGateNotificationMutationVariables = {data: BodyType<PayGateNotification>}
+
+    /**
+ * @summary Provider-only callback authenticated by checksum and server-side query
+ */
+export const useReceivePayGateNotification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof receivePayGateNotification>>, TError,ReceivePayGateNotificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof receivePayGateNotification>>,
+        TError,
+        ReceivePayGateNotificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReceivePayGateNotificationMutationOptions(options));
+    }
+
+export const getReturnFromPayGateUrl = () => {
+
+
+
+
+  return `/api/billing/paygate/return`
+}
+
+/**
+ * @summary Browser return only; never grants paid access
+ */
+export const returnFromPayGate = async ( options?: Parameters<typeof customFetch>[1]): Promise<unknown> => {
+
+  return customFetch<unknown>(getReturnFromPayGateUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReturnFromPayGateMutationKey = () => ['returnFromPayGate'] as const;
+
+export const getReturnFromPayGateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof returnFromPayGate>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof returnFromPayGate>>, TError,void, TContext> => {
+
+const mutationKey = getReturnFromPayGateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof returnFromPayGate>>, void> = () => {
+
+
+          return  returnFromPayGate(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReturnFromPayGateMutationResult = NonNullable<Awaited<ReturnType<typeof returnFromPayGate>>>
+
+    export type ReturnFromPayGateMutationError = ErrorType<void>
+
+
+    /**
+ * @summary Browser return only; never grants paid access
+ */
+export const useReturnFromPayGate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof returnFromPayGate>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof returnFromPayGate>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReturnFromPayGateMutationOptions(options));
     }
 
 export const getListLearnersUrl = () => {

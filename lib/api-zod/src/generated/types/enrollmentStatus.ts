@@ -14,4 +14,5 @@ export const EnrollmentStatus = {
   active: 'active',
   cancelling: 'cancelling',
   cancelled: 'cancelled',
+  past_due: 'past_due',
 } as const;

@@ -146,6 +146,7 @@ export const EnrollmentStatus = {
   active: 'active',
   cancelling: 'cancelling',
   cancelled: 'cancelled',
+  past_due: 'past_due',
 } as const;
 
 export type EnrollmentPaymentStatus = typeof EnrollmentPaymentStatus[keyof typeof EnrollmentPaymentStatus];
@@ -155,6 +156,8 @@ export const EnrollmentPaymentStatus = {
   awaiting_provider: 'awaiting_provider',
   paid: 'paid',
   failed: 'failed',
+  pending: 'pending',
+  refunded: 'refunded',
 } as const;
 
 export interface Enrollment {
@@ -197,6 +200,112 @@ export interface EnrollmentUpdate {
      * @maxItems 2
      */
   subjectIds?: string[];
+}
+
+export type BillingConfigProvider = typeof BillingConfigProvider[keyof typeof BillingConfigProvider];
+
+
+export const BillingConfigProvider = {
+  paygate: 'paygate',
+} as const;
+
+export type BillingConfigMode = typeof BillingConfigMode[keyof typeof BillingConfigMode];
+
+
+export const BillingConfigMode = {
+  disabled: 'disabled',
+  sandbox: 'sandbox',
+  live: 'live',
+} as const;
+
+export interface BillingConfig {
+  provider: BillingConfigProvider;
+  enabled: boolean;
+  mode: BillingConfigMode;
+  message: string;
+}
+
+export interface CheckoutInput {
+  idempotencyKey: string;
+  recurringConsent: boolean;
+}
+
+export interface RefundInput {
+  paymentId: string;
+  idempotencyKey: string;
+}
+
+export type BillingCheckoutFields = {[key: string]: string};
+
+export interface BillingCheckout {
+  paymentId: string;
+  actionUrl: string;
+  fields: BillingCheckoutFields;
+}
+
+export type BillingPaymentKind = typeof BillingPaymentKind[keyof typeof BillingPaymentKind];
+
+
+export const BillingPaymentKind = {
+  checkout: 'checkout',
+  renewal: 'renewal',
+  refund: 'refund',
+} as const;
+
+export type BillingPaymentState = typeof BillingPaymentState[keyof typeof BillingPaymentState];
+
+
+export const BillingPaymentState = {
+  submitting: 'submitting',
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  uncertain: 'uncertain',
+} as const;
+
+export interface BillingPayment {
+  id: string;
+  kind: BillingPaymentKind;
+  amountCents: number;
+  state: BillingPaymentState;
+  createdAt: string;
+  /** @nullable */
+  paidAt?: string | null;
+  /** @nullable */
+  periodStart?: string | null;
+  /** @nullable */
+  periodEnd?: string | null;
+  canRefund: boolean;
+}
+
+export interface EnrollmentBilling {
+  autoRenew: boolean;
+  pendingSubjectIds: string[];
+  payments: BillingPayment[];
+  hasUnresolvedPayment: boolean;
+}
+
+export interface PayGateNotification {
+  PAYGATE_ID: string;
+  PAY_REQUEST_ID: string;
+  REFERENCE: string;
+  TRANSACTION_STATUS: string;
+  RESULT_CODE?: string;
+  AUTH_CODE?: string;
+  CURRENCY: string;
+  AMOUNT: string;
+  RESULT_DESC?: string;
+  TRANSACTION_ID?: string;
+  RISK_INDICATOR?: string;
+  PAY_METHOD?: string;
+  PAY_METHOD_DETAIL?: string;
+  USER1?: string;
+  USER2?: string;
+  USER3?: string;
+  VAULT_ID?: string;
+  PAYVAULT_DATA_1?: string;
+  PAYVAULT_DATA_2?: string;
+  CHECKSUM: string;
 }
 
 export type ClassSessionStatus = typeof ClassSessionStatus[keyof typeof ClassSessionStatus];

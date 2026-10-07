@@ -184,6 +184,132 @@ paths:
                 $ref: "#/components/schemas/Enrollment"
         "404":
           description: Subscription not found
+  /billing/config:
+    get:
+      operationId: getBillingConfig
+      tags: [billing]
+      summary: Public payment provider readiness (never returns credentials)
+      responses:
+        "200":
+          description: Configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingConfig"
+  /enrollments/{enrollmentId}/checkout:
+    get:
+      operationId: recoverEnrollmentCheckout
+      tags: [billing]
+      summary: Reopen an existing pending checkout after navigation; never creates a new charge
+      parameters:
+        - { name: enrollmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Existing hosted checkout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingCheckout"
+        "404": { description: No pending hosted checkout }
+        "503": { description: PayGate is not configured }
+    post:
+      operationId: startEnrollmentCheckout
+      tags: [billing]
+      summary: Start or reuse a PayGate hosted card checkout
+      parameters:
+        - { name: enrollmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "200":
+          description: Form fields to POST to PayGate (contains no credentials)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingCheckout"
+        "409": { description: Payment is already in progress or subscription is already paid }
+        "503": { description: PayGate is not configured }
+  /enrollments/{enrollmentId}/billing:
+    get:
+      operationId: getEnrollmentBilling
+      tags: [billing]
+      summary: Parent-owned payment history, renewal settings and refund eligibility
+      parameters:
+        - { name: enrollmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Billing details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollmentBilling"
+  /enrollments/{enrollmentId}/reconcile:
+    post:
+      operationId: reconcileEnrollmentBilling
+      tags: [billing]
+      summary: Query PayGate for outstanding payments; does not initiate another charge
+      parameters:
+        - { name: enrollmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Refreshed billing details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollmentBilling"
+        "503": { description: PayGate is not configured }
+  /enrollments/{enrollmentId}/refunds:
+    post:
+      operationId: refundEnrollmentPayment
+      tags: [billing]
+      summary: Request a full refund of a payment within 30 days and stop renewals
+      parameters:
+        - { name: enrollmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundInput"
+      responses:
+        "200":
+          description: Refund outcome; pending or uncertain is not a confirmed refund
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnrollmentBilling"
+        "409": { description: Payment is not refundable or another payment is unresolved }
+        "503": { description: PayGate is not configured }
+  /billing/paygate/notify:
+    post:
+      operationId: receivePayGateNotification
+      tags: [billing]
+      summary: Provider-only callback authenticated by checksum and server-side query
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PayGateNotification"
+      responses:
+        "200":
+          description: Plain-text OK; duplicate events are harmless
+          content:
+            text/plain:
+              schema: { type: string }
+        "400": { description: Invalid notification }
+        "503": { description: Provider unavailable; retry notification }
+  /billing/paygate/return:
+    post:
+      operationId: returnFromPayGate
+      tags: [billing]
+      summary: Browser return only; never grants paid access
+      responses:
+        "303": { description: Redirect to the subscriptions page }
   /learners:
     get:
       operationId: listLearners
@@ -561,8 +687,8 @@ components:
           type: array
           items: { type: string }
         monthlyAmountZar: { type: integer }
-        status: { type: string, enum: [pending, active, cancelling, cancelled] }
-        paymentStatus: { type: string, enum: [awaiting_provider, paid, failed] }
+        status: { type: string, enum: [pending, active, cancelling, cancelled, past_due] }
+        paymentStatus: { type: string, enum: [awaiting_provider, paid, failed, pending, refunded] }
         periodEndsAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
     EnrollmentInput:
@@ -585,6 +711,84 @@ components:
           minItems: 1
           maxItems: 2
           items: { type: string }
+    BillingConfig:
+      type: object
+      required: [provider, enabled, mode, message]
+      properties:
+        provider: { type: string, enum: [paygate] }
+        enabled: { type: boolean }
+        mode: { type: string, enum: [disabled, sandbox, live] }
+        message: { type: string }
+    CheckoutInput:
+      type: object
+      required: [idempotencyKey, recurringConsent]
+      properties:
+        idempotencyKey: { type: string, format: uuid }
+        recurringConsent: { type: boolean }
+    RefundInput:
+      type: object
+      required: [paymentId, idempotencyKey]
+      properties:
+        paymentId: { type: string, format: uuid }
+        idempotencyKey: { type: string, format: uuid }
+    BillingCheckout:
+      type: object
+      required: [paymentId, actionUrl, fields]
+      properties:
+        paymentId: { type: string, format: uuid }
+        actionUrl: { type: string, format: uri }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+    BillingPayment:
+      type: object
+      required: [id, kind, amountCents, state, createdAt, canRefund]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [checkout, renewal, refund] }
+        amountCents: { type: integer }
+        state: { type: string, enum: [submitting, pending, succeeded, failed, uncertain] }
+        createdAt: { type: string, format: date-time }
+        paidAt: { type: ["string", "null"], format: date-time }
+        periodStart: { type: ["string", "null"], format: date-time }
+        periodEnd: { type: ["string", "null"], format: date-time }
+        canRefund: { type: boolean }
+    EnrollmentBilling:
+      type: object
+      required: [autoRenew, pendingSubjectIds, payments, hasUnresolvedPayment]
+      properties:
+        autoRenew: { type: boolean }
+        pendingSubjectIds:
+          type: array
+          items: { type: string }
+        payments:
+          type: array
+          items: { $ref: "#/components/schemas/BillingPayment" }
+        hasUnresolvedPayment: { type: boolean }
+    PayGateNotification:
+      type: object
+      required: [PAYGATE_ID, PAY_REQUEST_ID, REFERENCE, TRANSACTION_STATUS, CURRENCY, AMOUNT, CHECKSUM]
+      properties:
+        PAYGATE_ID: { type: string }
+        PAY_REQUEST_ID: { type: string }
+        REFERENCE: { type: string }
+        TRANSACTION_STATUS: { type: string }
+        RESULT_CODE: { type: string }
+        AUTH_CODE: { type: string }
+        CURRENCY: { type: string }
+        AMOUNT: { type: string }
+        RESULT_DESC: { type: string }
+        TRANSACTION_ID: { type: string }
+        RISK_INDICATOR: { type: string }
+        PAY_METHOD: { type: string }
+        PAY_METHOD_DETAIL: { type: string }
+        USER1: { type: string }
+        USER2: { type: string }
+        USER3: { type: string }
+        VAULT_ID: { type: string }
+        PAYVAULT_DATA_1: { type: string }
+        PAYVAULT_DATA_2: { type: string }
+        CHECKSUM: { type: string }
     ClassSession:
       type: object
       required: [id, courseId, courseTitle, subjectName, title, startsAt, durationMinutes, status, tutorName]

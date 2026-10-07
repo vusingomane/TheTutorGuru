@@ -41,6 +41,28 @@ public static class MigrationCli
     {
         Directory.CreateDirectory(Root);
         File.SetUnixFileMode(Root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        if (args[0] == "--migrate-billing")
+        {
+            var before = await Snapshot(db);
+            var dump = Path.Combine(Root, "pre-billing-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + ".dump");
+            var psi = new ProcessStartInfo("pg_dump") { RedirectStandardError = true };
+            psi.ArgumentList.Add("--format=custom");
+            psi.ArgumentList.Add("--file=" + dump);
+            foreach (var (key, value) in db.BackupEnvironment) psi.Environment[key] = value;
+            using var process = Process.Start(psi)!;
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0) throw new InvalidOperationException("Database backup failed. Billing migration has not run.");
+            File.SetUnixFileMode(dump, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            await using var connection = await db.Open();
+            await using var transaction = await connection.BeginTransactionAsync();
+            await connection.ExecuteAsync("SELECT pg_advisory_xact_lock(94223002)", transaction: transaction);
+            await connection.ExecuteAsync(await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Data/billing.sql")), transaction: transaction);
+            await transaction.CommitAsync();
+            var after = await Snapshot(db);
+            var changed = before.Sum(t => t.Value.Count(r => !after[t.Key].TryGetValue(r.Key, out var hash) || hash != r.Value));
+            Console.WriteLine($"Additive billing schema applied. {changed} existing domain rows changed or missing. Private backup retained.");
+            return changed == 0 ? 0 : 1;
+        }
         if (args[0] == "--migrate")
         {
             var baselinePath = Path.Combine(Root, "pre-dotnet-fingerprints.json");
@@ -98,6 +120,6 @@ public static class MigrationCli
             Console.WriteLine("Single-use invitation written to a private .data file. Deliver only to the verified owner; never publish this file.");
             return 0;
         }
-        throw new InvalidOperationException("Supported commands: --migrate, --verify-preservation, --issue-invitation <legacy-profile-id>.");
+        throw new InvalidOperationException("Supported commands: --migrate, --migrate-billing, --verify-preservation, --issue-invitation <legacy-profile-id>.");
     }
 }

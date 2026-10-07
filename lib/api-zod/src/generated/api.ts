@@ -158,8 +158,8 @@ export const ListEnrollmentsResponseItem = zod.object({
   "learnerGrade": zod.number().int(),
   "subjectIds": zod.array(zod.string()),
   "monthlyAmountZar": zod.number().int(),
-  "status": zod.enum(['pending', 'active', 'cancelling', 'cancelled']),
-  "paymentStatus": zod.enum(['awaiting_provider', 'paid', 'failed']),
+  "status": zod.enum(['pending', 'active', 'cancelling', 'cancelled', 'past_due']),
+  "paymentStatus": zod.enum(['awaiting_provider', 'paid', 'failed', 'pending', 'refunded']),
   "periodEndsAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -185,8 +185,8 @@ export const CreateEnrollmentResponse = zod.object({
   "learnerGrade": zod.number().int(),
   "subjectIds": zod.array(zod.string()),
   "monthlyAmountZar": zod.number().int(),
-  "status": zod.enum(['pending', 'active', 'cancelling', 'cancelled']),
-  "paymentStatus": zod.enum(['awaiting_provider', 'paid', 'failed']),
+  "status": zod.enum(['pending', 'active', 'cancelling', 'cancelled', 'past_due']),
+  "paymentStatus": zod.enum(['awaiting_provider', 'paid', 'failed', 'pending', 'refunded']),
   "periodEndsAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -215,11 +215,170 @@ export const UpdateEnrollmentResponse = zod.object({
   "learnerGrade": zod.number().int(),
   "subjectIds": zod.array(zod.string()),
   "monthlyAmountZar": zod.number().int(),
-  "status": zod.enum(['pending', 'active', 'cancelling', 'cancelled']),
-  "paymentStatus": zod.enum(['awaiting_provider', 'paid', 'failed']),
+  "status": zod.enum(['pending', 'active', 'cancelling', 'cancelled', 'past_due']),
+  "paymentStatus": zod.enum(['awaiting_provider', 'paid', 'failed', 'pending', 'refunded']),
   "periodEndsAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Public payment provider readiness (never returns credentials)
+ */
+export const GetBillingConfigResponse = zod.object({
+  "provider": zod.enum(['paygate']),
+  "enabled": zod.boolean(),
+  "mode": zod.enum(['disabled', 'sandbox', 'live']),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Reopen an existing pending checkout after navigation; never creates a new charge
+ */
+export const RecoverEnrollmentCheckoutParams = zod.object({
+  "enrollmentId": zod.coerce.string().uuid()
+})
+
+export const RecoverEnrollmentCheckoutResponse = zod.object({
+  "paymentId": zod.string().uuid(),
+  "actionUrl": zod.string().url(),
+  "fields": zod.record(zod.string(), zod.string())
+})
+
+
+/**
+ * @summary Start or reuse a PayGate hosted card checkout
+ */
+export const StartEnrollmentCheckoutParams = zod.object({
+  "enrollmentId": zod.coerce.string().uuid()
+})
+
+export const StartEnrollmentCheckoutBody = zod.object({
+  "idempotencyKey": zod.string().uuid(),
+  "recurringConsent": zod.boolean()
+})
+
+export const StartEnrollmentCheckoutResponse = zod.object({
+  "paymentId": zod.string().uuid(),
+  "actionUrl": zod.string().url(),
+  "fields": zod.record(zod.string(), zod.string())
+})
+
+
+/**
+ * @summary Parent-owned payment history, renewal settings and refund eligibility
+ */
+export const GetEnrollmentBillingParams = zod.object({
+  "enrollmentId": zod.coerce.string().uuid()
+})
+
+export const GetEnrollmentBillingResponse = zod.object({
+  "autoRenew": zod.boolean(),
+  "pendingSubjectIds": zod.array(zod.string()),
+  "payments": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "kind": zod.enum(['checkout', 'renewal', 'refund']),
+  "amountCents": zod.number().int(),
+  "state": zod.enum(['submitting', 'pending', 'succeeded', 'failed', 'uncertain']),
+  "createdAt": zod.coerce.date(),
+  "paidAt": zod.coerce.date().nullish(),
+  "periodStart": zod.coerce.date().nullish(),
+  "periodEnd": zod.coerce.date().nullish(),
+  "canRefund": zod.boolean()
+})),
+  "hasUnresolvedPayment": zod.boolean()
+})
+
+
+/**
+ * @summary Query PayGate for outstanding payments; does not initiate another charge
+ */
+export const ReconcileEnrollmentBillingParams = zod.object({
+  "enrollmentId": zod.coerce.string().uuid()
+})
+
+export const ReconcileEnrollmentBillingResponse = zod.object({
+  "autoRenew": zod.boolean(),
+  "pendingSubjectIds": zod.array(zod.string()),
+  "payments": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "kind": zod.enum(['checkout', 'renewal', 'refund']),
+  "amountCents": zod.number().int(),
+  "state": zod.enum(['submitting', 'pending', 'succeeded', 'failed', 'uncertain']),
+  "createdAt": zod.coerce.date(),
+  "paidAt": zod.coerce.date().nullish(),
+  "periodStart": zod.coerce.date().nullish(),
+  "periodEnd": zod.coerce.date().nullish(),
+  "canRefund": zod.boolean()
+})),
+  "hasUnresolvedPayment": zod.boolean()
+})
+
+
+/**
+ * @summary Request a full refund of a payment within 30 days and stop renewals
+ */
+export const RefundEnrollmentPaymentParams = zod.object({
+  "enrollmentId": zod.coerce.string().uuid()
+})
+
+export const RefundEnrollmentPaymentBody = zod.object({
+  "paymentId": zod.string().uuid(),
+  "idempotencyKey": zod.string().uuid()
+})
+
+export const RefundEnrollmentPaymentResponse = zod.object({
+  "autoRenew": zod.boolean(),
+  "pendingSubjectIds": zod.array(zod.string()),
+  "payments": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "kind": zod.enum(['checkout', 'renewal', 'refund']),
+  "amountCents": zod.number().int(),
+  "state": zod.enum(['submitting', 'pending', 'succeeded', 'failed', 'uncertain']),
+  "createdAt": zod.coerce.date(),
+  "paidAt": zod.coerce.date().nullish(),
+  "periodStart": zod.coerce.date().nullish(),
+  "periodEnd": zod.coerce.date().nullish(),
+  "canRefund": zod.boolean()
+})),
+  "hasUnresolvedPayment": zod.boolean()
+})
+
+
+/**
+ * @summary Provider-only callback authenticated by checksum and server-side query
+ */
+export const ReceivePayGateNotificationBody = zod.object({
+  "PAYGATE_ID": zod.string(),
+  "PAY_REQUEST_ID": zod.string(),
+  "REFERENCE": zod.string(),
+  "TRANSACTION_STATUS": zod.string(),
+  "RESULT_CODE": zod.string().optional(),
+  "AUTH_CODE": zod.string().optional(),
+  "CURRENCY": zod.string(),
+  "AMOUNT": zod.string(),
+  "RESULT_DESC": zod.string().optional(),
+  "TRANSACTION_ID": zod.string().optional(),
+  "RISK_INDICATOR": zod.string().optional(),
+  "PAY_METHOD": zod.string().optional(),
+  "PAY_METHOD_DETAIL": zod.string().optional(),
+  "USER1": zod.string().optional(),
+  "USER2": zod.string().optional(),
+  "USER3": zod.string().optional(),
+  "VAULT_ID": zod.string().optional(),
+  "PAYVAULT_DATA_1": zod.string().optional(),
+  "PAYVAULT_DATA_2": zod.string().optional(),
+  "CHECKSUM": zod.string()
+})
+
+export const ReceivePayGateNotificationResponse = zod.string()
+
+
+/**
+ * @summary Browser return only; never grants paid access
+ */
+export const ReturnFromPayGateResponse = zod.void()
 
 
 /**

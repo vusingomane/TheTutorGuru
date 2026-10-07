@@ -70,23 +70,10 @@ public static class AccountEndpoints
             var row = await db.One("INSERT INTO guru_enrollments(parent_id,learner_id,subject_ids,monthly_amount_zar) VALUES($1,$2,$3,$4) RETURNING id", Tutoring.Id(c), body.LearnerId, body.SubjectIds, body.SubjectIds.Length == 1 ? 290 : 495);
             return Results.Json(await db.One(Tutoring.EnrollmentSelect + " WHERE e.id=$1", row!["id"]), statusCode: 201);
         });
-        app.MapPatch("/api/enrollments/{enrollmentId:guid}", async (Guid enrollmentId, EnrollmentUpdate body, HttpContext c, Database db, Tutoring domain) =>
+        app.MapPatch("/api/enrollments/{enrollmentId:guid}", async (Guid enrollmentId, EnrollmentUpdate body, HttpContext c, Database db, Tutoring domain, Billing.BillingService billing) =>
         {
             Tutoring.RequireRole(c, "parent");
-            var e = await db.One("SELECT e.*,l.grade FROM guru_enrollments e JOIN guru_learners l ON l.id=e.learner_id WHERE e.id=$1 AND e.parent_id=$2", enrollmentId, Tutoring.Id(c)) ?? throw new HttpError(404, "Subscription not found.");
-            if ((string)e["payment_status"]! == "paid") throw new HttpError(409, "Paid subscription management requires the payment gateway to be connected. No billing change has been made.");
-            switch (body.Action)
-            {
-                case "change":
-                    await domain.ValidateSubjects(body.SubjectIds, (int)e["grade"]!);
-                    await db.Query("UPDATE guru_enrollments SET subject_ids=$1,monthly_amount_zar=$2 WHERE id=$3", body.SubjectIds, body.SubjectIds!.Length == 1 ? 290 : 495, enrollmentId);
-                    break;
-                case "cancel": await db.Query("UPDATE guru_enrollments SET status='cancelled' WHERE id=$1", enrollmentId); break;
-                case "resume":
-                    if ((string)e["status"]! != "cancelling") throw new HttpError(409, "Only a subscription scheduled to cancel can be resumed.");
-                    await db.Query("UPDATE guru_enrollments SET status='active' WHERE id=$1", enrollmentId); break;
-                default: throw new HttpError(400, "Choose cancel, resume, or change.");
-            }
+            await billing.Change(enrollmentId, Tutoring.Id(c), body, domain);
             return Results.Json(await db.One(Tutoring.EnrollmentSelect + " WHERE e.id=$1", enrollmentId));
         });
     }

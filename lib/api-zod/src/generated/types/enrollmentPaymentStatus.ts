@@ -13,4 +13,6 @@ export const EnrollmentPaymentStatus = {
   awaiting_provider: 'awaiting_provider',
   paid: 'paid',
   failed: 'failed',
+  pending: 'pending',
+  refunded: 'refunded',
 } as const;
