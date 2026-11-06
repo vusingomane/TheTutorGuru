@@ -48,6 +48,19 @@ public static class ClassEndpoints
             }
             return Results.Json(await db.One(Tutoring.SessionSelect + " WHERE ss.id=$1", sessionId));
         });
+        app.MapGet("/api/attendance/{sessionId:guid}", async (Guid sessionId, HttpContext c, Tutoring domain, Database db) =>
+        {
+            var session = await db.One("SELECT course_id FROM guru_sessions WHERE id=$1", sessionId) ?? throw new HttpError(404, "Session not found.");
+            var course = await domain.Owner(c, (Guid)session["course_id"]!);
+            return Results.Json(await db.Query("""
+                SELECT l.id,l.name,l.email,l.grade,a.attended,a.marked_at AS "markedAt"
+                FROM guru_learners l LEFT JOIN guru_attendance a ON a.learner_id=l.id AND a.session_id=$1
+                WHERE EXISTS (SELECT 1 FROM guru_enrollments e WHERE e.learner_id=l.id
+                    AND $2=ANY(e.subject_ids) AND l.grade BETWEEN $3 AND $4
+                    AND e.payment_status='paid' AND e.status IN ('active','cancelling') AND e.period_ends_at>now()
+                """ + domain.PaymentEnvironmentFilter + ") ORDER BY l.name,l.id",
+                sessionId, course["subject_id"], course["grade_min"], course["grade_max"]));
+        });
         app.MapPut("/api/attendance/{sessionId:guid}/{learnerId:guid}", async (Guid sessionId, Guid learnerId, AttendanceInput body, HttpContext c, Tutoring domain, Database db) =>
         {
             var ss = await db.One("SELECT course_id FROM guru_sessions WHERE id=$1", sessionId) ?? throw new HttpError(404, "Session not found.");

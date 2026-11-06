@@ -4,3 +4,4 @@
 - [PayGate sandbox documentation](paygate-sandbox-docs.md) — public test presets conflict across official pages; verify product-specific requests rather than trusting a generic example.
 - [Administrator account activation](preview-email-verification.md) — registration needs no email service; new accounts require administrator activation in preview and production.
 - [Administrator scope](administrator-scope.md) — the user requested a full platform administrator, not a tutor account; public onboarding must never grant that role.
+- [Build output verification](build-output-verification.md) — empty shell results are not build evidence; capture the process exit and compiler output when .NET output is absent.

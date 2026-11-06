@@ -1,4 +1,5 @@
 @page "/learners"
+@page "/attendance"
 @inherits GuruPage
 
 <Frame Title="@(IsTutor ? "Attendance" : "Learners")" Subtitle="@(IsTutor ? "Choose a session and mark who attended." : "Add the learners you pay for.")" Loading="Loading" Error="@LoadError" OnRetry="Reload">
@@ -15,9 +16,12 @@
     }
     @if (IsTutor)
     {
-        <MudSelect T="string" @bind-Value="_session" Label="Session" Variant="Variant.Outlined" Class="mb-4">
+        <MudSelect T="string" Value="_session" ValueChanged="SelectSession" Label="Session" Variant="Variant.Outlined" Class="mb-4" Disabled="_saving.Count > 0">
             @foreach (var s in _sessions) { <MudSelectItem T="string" Value="@s.S("id")">@s.S("title") - @J.Date(s.S("startsAt"))</MudSelectItem> }
         </MudSelect>
+        @if (_sessions.Count == 0) { <MudAlert Severity="Severity.Info" Class="mb-4">No sessions are available. Create a class session first.</MudAlert> }
+        @if (_rosterLoading) { <MudProgressLinear Indeterminate Color="Color.Primary" Class="mb-4" /> }
+        @if (_rosterError != null) { <MudAlert Severity="Severity.Error" Class="mb-4">@_rosterError <MudButton OnClick="() => SelectSession(_session)">Retry</MudButton></MudAlert> }
     }
     @if (_learners.Count == 0) { <Empty Icon="@Icons.Material.Filled.Groups" Title="No learners yet" Text="@(IsParent ? "Add your first learner above." : "Learners appear once they have an active subscription.")" /> }
     else
@@ -33,8 +37,8 @@
                     @if (IsTutor)
                     {
                         <MudStack Row Spacing="1">
-                            <MudButton Size="Size.Small" Variant="@(_att.GetValueOrDefault(id) == true ? Variant.Filled : Variant.Outlined)" Color="Color.Success" Disabled="string.IsNullOrEmpty(_session)" OnClick="() => Mark(id, true)">Present</MudButton>
-                            <MudButton Size="Size.Small" Variant="@(_att.GetValueOrDefault(id) == false ? Variant.Filled : Variant.Outlined)" Color="Color.Error" Disabled="string.IsNullOrEmpty(_session)" OnClick="() => Mark(id, false)">Absent</MudButton>
+                            <MudButton Size="Size.Small" Variant="@(_att.TryGetValue(id, out var present) && present ? Variant.Filled : Variant.Outlined)" Color="Color.Success" Disabled="@(string.IsNullOrEmpty(_session) || _rosterLoading || _saving.Contains(id))" OnClick="() => Mark(id, true)">Present</MudButton>
+                            <MudButton Size="Size.Small" Variant="@(_att.TryGetValue(id, out var absent) && !absent ? Variant.Filled : Variant.Outlined)" Color="Color.Error" Disabled="@(string.IsNullOrEmpty(_session) || _rosterLoading || _saving.Contains(id))" OnClick="() => Mark(id, false)">Absent</MudButton>
                         </MudStack>
                     }
                 </MudStack>
@@ -48,10 +52,35 @@
 @code {
     List<JsonNode> _learners = new(), _sessions = new(); string _name = "", _email = "", _session = ""; int _grade = 8; bool _busy;
     Dictionary<string, bool> _att = new();
+    readonly HashSet<string> _saving = new();
+    bool _rosterLoading; string? _rosterError;
+    int _rosterVersion;
     protected override async Task Load()
     {
-        _learners = (await Api.Send("/learners")).L();
-        if (IsTutor) _sessions = (await Api.Send("/sessions")).L();
+        if (IsTutor)
+        {
+            _sessions = (await Api.Send("/sessions")).L();
+            if (!_sessions.Any(s => s.S("id") == _session)) _session = _sessions.FirstOrDefault().S("id");
+            await SelectSession(_session);
+        }
+        else _learners = (await Api.Send("/learners")).L();
+    }
+    async Task SelectSession(string session)
+    {
+        var version = ++_rosterVersion;
+        _session = session; _att.Clear(); _learners = new(); _rosterError = null;
+        if (string.IsNullOrEmpty(session)) { _rosterLoading = false; return; }
+        _rosterLoading = true;
+        try
+        {
+            var rows = (await Api.Send($"/attendance/{Uri.EscapeDataString(session)}")).L();
+            if (version != _rosterVersion) return;
+            _learners = rows;
+            foreach (var learner in rows)
+                if (learner["attended"] is not null) _att[learner.S("id")] = learner.B("attended");
+        }
+        catch (Exception e) { if (version == _rosterVersion) _rosterError = e.Message; }
+        finally { if (version == _rosterVersion) _rosterLoading = false; }
     }
     async Task Add()
     {
@@ -62,6 +91,13 @@
     }
     async Task Mark(string learnerId, bool attended)
     {
-        if (await Run(async () => await Api.Send($"/attendance/{_session}/{learnerId}", "PUT", new { attended }), attended ? "Marked present." : "Marked absent.")) _att[learnerId] = attended;
+        var session = _session;
+        if (string.IsNullOrEmpty(session) || !_saving.Add(learnerId)) return;
+        try
+        {
+            if (await Run(async () => await Api.Send($"/attendance/{session}/{learnerId}", "PUT", new { attended }), attended ? "Marked present." : "Marked absent.") && _session == session)
+                _att[learnerId] = attended;
+        }
+        finally { _saving.Remove(learnerId); }
     }
 }
