@@ -7,6 +7,10 @@
  */
 
 export * from './activityItem';
+export * from './adminCourseInput';
+export * from './adminOverview';
+export * from './adminUser';
+export * from './adminUserAccessInput';
 export * from './attendance';
 export * from './attendanceInput';
 export * from './billingCheckout';
@@ -17,6 +21,7 @@ export * from './billingConfigProvider';
 export * from './billingPayment';
 export * from './billingPaymentKind';
 export * from './billingPaymentState';
+export * from './cancelAdminSubscription200';
 export * from './checkoutInput';
 export * from './classSession';
 export * from './classSessionStatus';
@@ -32,6 +37,9 @@ export * from './enrollmentUpdateAction';
 export * from './healthStatus';
 export * from './learner';
 export * from './learnerInput';
+export * from './listAdminCourses200Item';
+export * from './listAdminSubscriptions200Item';
+export * from './listAdminTutors200Item';
 export * from './listCoursesParams';
 export * from './listMaterialsParams';
 export * from './listProgressParams';
@@ -53,5 +61,6 @@ export * from './sessionInput';
 export * from './sessionUpdate';
 export * from './sessionUpdateStatus';
 export * from './subject';
+export * from './updateAdminUserAccess200';
 export * from './uploadRequest';
 export * from './uploadUrl';

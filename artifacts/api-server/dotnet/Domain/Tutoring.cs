@@ -8,7 +8,7 @@ public sealed class HttpError(int status, string message) : Exception(message)
 {
     public int Status { get; } = status;
 }
-public sealed class Tutoring(Database db, IHostEnvironment environment)
+public sealed class Tutoring(Database db, IHostEnvironment environment, UserManager<IdentityUser> users)
 {
     // Development test payments must never grant access on a published production service.
     public string PaymentEnvironmentFilter => environment.IsDevelopment() ? "" :
@@ -26,6 +26,9 @@ public sealed class Tutoring(Database db, IHostEnvironment environment)
     {
         var identityId = c.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (identityId is null) throw new HttpError(401, "Please sign in to continue.");
+        var identity = await users.GetUserAsync(c.User);
+        if (identity is null) throw new HttpError(401, "Please sign in to continue.");
+        if (await users.IsLockedOutAsync(identity)) throw new HttpError(403, "This account's access is suspended.");
         var mapped = await db.One("SELECT profile_id FROM guru_identity_profile_links WHERE identity_id=$1", identityId);
         var id = mapped?["profile_id"]?.ToString() ?? identityId;
         c.Items["profileId"] = id;
@@ -35,6 +38,7 @@ public sealed class Tutoring(Database db, IHostEnvironment environment)
     }
     public async Task<Guid[]> Accessible(HttpContext c)
     {
+        if (Role(c) == "admin") return (await db.Query("SELECT id FROM guru_courses")).Select(r => (Guid)r["id"]!).ToArray();
         var p = Profile(c);
         if (Role(c) == "tutor")
             return (await db.Query("SELECT id FROM guru_courses WHERE tutor_id=$1", Id(c))).Select(r => (Guid)r["id"]!).ToArray();
@@ -48,11 +52,13 @@ public sealed class Tutoring(Database db, IHostEnvironment environment)
     }
     public async Task<IDictionary<string, object?>> Owner(HttpContext c, Guid courseId)
     {
+        if (Role(c) == "admin") return await db.One("SELECT * FROM guru_courses WHERE id=$1", courseId) ?? throw new HttpError(404, "Course not found.");
         RequireRole(c, "tutor");
         return await db.One("SELECT * FROM guru_courses WHERE id=$1 AND tutor_id=$2", courseId, Id(c)) ?? throw new HttpError(404, "Course not found.");
     }
     public async Task<List<IDictionary<string, object?>>> Learners(HttpContext c)
     {
+        if (Role(c) == "admin") return await db.Query("""SELECT id,name,email,grade,created_at AS "createdAt" FROM guru_learners ORDER BY name""");
         if (Role(c) == "parent") return await db.Query("""SELECT id,name,email,grade,created_at AS "createdAt" FROM guru_learners WHERE parent_id=$1 ORDER BY created_at DESC""", Id(c));
         if (Role(c) == "learner") return await db.Query("""SELECT id,name,email,grade,created_at AS "createdAt" FROM guru_learners WHERE lower(email)=lower($1)""", Profile(c)["email"]);
         return await db.Query("""

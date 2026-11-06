@@ -31,18 +31,26 @@
     {
         <MudDrawer @bind-Open="_open" Breakpoint="Breakpoint.Md" Variant="DrawerVariant.Responsive" Elevation="0">
             <MudNavMenu Class="pa-2">
-                <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-                <MudNavLink Href="/subjects" Icon="@Icons.Material.Filled.MenuBook">Subjects</MudNavLink>
-                @if (Api.Role == "parent")
+                @if (Api.Role == "admin")
                 {
-                    <MudNavLink Href="/learners" Icon="@Icons.Material.Filled.Groups">Learners</MudNavLink>
-                    <MudNavLink Href="/subscriptions" Icon="@Icons.Material.Filled.CreditCard">Subscriptions</MudNavLink>
+                    <MudNavLink Href="/admin" Icon="@Icons.Material.Filled.AdminPanelSettings">Admin</MudNavLink>
+                    <MudNavLink Href="/resources" Icon="@Icons.Material.Filled.Folder">Resources</MudNavLink>
                 }
-                @if (Api.Role == "tutor") { <MudNavLink Href="/learners" Icon="@Icons.Material.Filled.Groups">Attendance</MudNavLink> }
-                <MudNavLink Href="/classes" Icon="@Icons.Material.Filled.Event">Classes</MudNavLink>
-                <MudNavLink Href="/resources" Icon="@Icons.Material.Filled.Folder">Resources</MudNavLink>
-                <MudNavLink Href="/recordings" Icon="@Icons.Material.Filled.VideoLibrary">Recordings</MudNavLink>
-                <MudNavLink Href="/progress" Icon="@Icons.Material.Filled.QueryStats">Progress</MudNavLink>
+                else
+                {
+                    <MudNavLink Href="/dashboard" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+                    <MudNavLink Href="/subjects" Icon="@Icons.Material.Filled.MenuBook">Subjects</MudNavLink>
+                    @if (Api.Role == "parent")
+                    {
+                        <MudNavLink Href="/learners" Icon="@Icons.Material.Filled.Groups">Learners</MudNavLink>
+                        <MudNavLink Href="/subscriptions" Icon="@Icons.Material.Filled.CreditCard">Subscriptions</MudNavLink>
+                    }
+                    @if (Api.Role == "tutor") { <MudNavLink Href="/learners" Icon="@Icons.Material.Filled.Groups">Attendance</MudNavLink> }
+                    <MudNavLink Href="/classes" Icon="@Icons.Material.Filled.Event">Classes</MudNavLink>
+                    <MudNavLink Href="/resources" Icon="@Icons.Material.Filled.Folder">Resources</MudNavLink>
+                    <MudNavLink Href="/recordings" Icon="@Icons.Material.Filled.VideoLibrary">Recordings</MudNavLink>
+                    <MudNavLink Href="/progress" Icon="@Icons.Material.Filled.QueryStats">Progress</MudNavLink>
+                }
                 <MudNavLink Href="/settings" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
             </MudNavMenu>
         </MudDrawer>

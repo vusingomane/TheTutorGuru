@@ -5,6 +5,50 @@
  * API for TheTutorGuru online high-school tutoring platform
  * OpenAPI spec version: 0.1.0
  */
+export interface AdminUserAccessInput {
+  locked: boolean;
+}
+
+export interface AdminCourseInput {
+  /**
+     * @minLength 2
+     * @maxLength 200
+     */
+  title: string;
+  tutorId: string;
+  /**
+     * @minimum 8
+     * @maximum 12
+     */
+  gradeMin: number;
+  /**
+     * @minimum 8
+     * @maximum 12
+     */
+  gradeMax: number;
+  /**
+     * @maxLength 1000
+     * @nullable
+     */
+  scheduleSummary?: string | null;
+}
+
+export interface AdminOverview {
+  accounts: number;
+  courses: number;
+  subscriptions: number;
+  activeSubscriptions: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  emailConfirmed: boolean;
+  lockedOut: boolean;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -24,6 +68,7 @@ export const ProfileRole = {
   parent: 'parent',
   learner: 'learner',
   tutor: 'tutor',
+  admin: 'admin',
 } as const;
 
 export interface Profile {
@@ -45,6 +90,7 @@ export const ProfileInputRole = {
   parent: 'parent',
   learner: 'learner',
   tutor: 'tutor',
+  admin: 'admin',
 } as const;
 
 export interface ProfileInput {
@@ -68,6 +114,7 @@ export const OverviewRole = {
   parent: 'parent',
   learner: 'learner',
   tutor: 'tutor',
+  admin: 'admin',
 } as const;
 
 export interface ActivityItem {
@@ -460,6 +507,29 @@ export interface UploadUrl {
   uploadURL: string;
   objectPath: string;
 }
+
+export type UpdateAdminUserAccess200 = {
+  message?: string;
+};
+
+export type ListAdminTutors200Item = {
+  id?: string;
+  fullName?: string;
+  email?: string;
+};
+
+export type ListAdminCourses200Item = Course & {
+  tutorId?: string;
+};
+
+export type ListAdminSubscriptions200Item = Enrollment & {
+  parentName?: string;
+  parentEmail?: string;
+};
+
+export type CancelAdminSubscription200 = {
+  message?: string;
+};
 
 export type ListCoursesParams = {
 subjectId?: string;

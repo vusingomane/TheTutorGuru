@@ -31,7 +31,7 @@
         {
             await Api.Send("/auth/login", "POST", new { email = _email.Trim(), password = _pw });
             await Api.RefreshProfile();
-            Nav.NavigateTo(Api.Profile == null ? "/onboarding" : "/dashboard");
+            Nav.NavigateTo(Api.Profile == null ? "/onboarding" : Api.Role == "admin" ? "/admin" : "/dashboard");
         }
         catch (ApiException e) { _msg = e.Message; _unconfirmed = e.Status == 403 || e.Message.Contains("verif", StringComparison.OrdinalIgnoreCase) || e.Message.Contains("confirm", StringComparison.OrdinalIgnoreCase); }
         catch (Exception e) { _msg = e.Message; }

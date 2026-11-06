@@ -12,7 +12,7 @@ using TutorGuru.Api.Storage;
 using TutorGuru.Api.Billing;
 
 var db = new Database();
-if (args.Length > 0 && args[0].StartsWith("--") && !args[0].StartsWith("--urls"))
+if (args.Length > 0 && args[0].StartsWith("--") && !args[0].StartsWith("--urls") && args[0] != "--bootstrap-admin")
 {
     if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("Migration tooling requires Linux.");
     Environment.ExitCode = await MigrationCli.Run(args, db);
@@ -25,6 +25,7 @@ builder.Services.AddSingleton(db);
 builder.Services.AddScoped<Tutoring>();
 builder.Services.AddScoped<ObjectStorage>();
 builder.Services.AddScoped<MailService>();
+builder.Services.AddScoped<AdminProvisioner>();
 builder.Services.AddSingleton<PayGateOptions>();
 builder.Services.AddScoped<PayGateClient>();
 builder.Services.AddScoped<BillingService>();
@@ -88,6 +89,25 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.KnownProxies.Add(System.Net.IPAddress.IPv6Loopback);
 });
 var app = builder.Build();
+if (args.Contains("--bootstrap-admin"))
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<AdminProvisioner>().Provision();
+    return;
+}
+if (app.Environment.IsProduction() && Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_ENABLED") == "true")
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AdminProvisioner>().Provision();
+    }
+    catch (Exception e)
+    {
+        // Keep the existing site serving; never log credentials or account data.
+        app.Logger.LogError("Administrator setup did not complete ({Type}). Review secure bootstrap configuration.", e.GetType().Name);
+    }
+}
 app.UseForwardedHeaders();
 app.Use(async (c, next) =>
 {
@@ -129,4 +149,5 @@ app.MapAccounts();
 app.MapClasses();
 app.MapResources();
 app.MapBilling();
+app.MapAdmin();
 app.Run();

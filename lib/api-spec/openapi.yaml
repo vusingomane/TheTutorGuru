@@ -15,6 +15,114 @@ tags:
   - name: storage
     description: Private file uploads and playback
 paths:
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      summary: Administrator-only platform counts
+      responses:
+        "200":
+          description: Platform totals
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOverview" }
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      summary: Administrator-only account directory without credentials
+      responses:
+        "200":
+          description: Accounts and access status
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/AdminUser" } }
+  /admin/users/{identityId}/access:
+    patch:
+      operationId: updateAdminUserAccess
+      summary: Suspend or restore a non-administrator account
+      parameters:
+        - { name: identityId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminUserAccessInput" }
+      responses:
+        "200":
+          description: Account access updated
+          content:
+            application/json:
+              schema: { type: object, properties: { message: { type: string } } }
+  /admin/tutors:
+    get:
+      operationId: listAdminTutors
+      summary: Administrator-only tutor directory for course assignment
+      responses:
+        "200":
+          description: Tutor profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: object, properties: { id: { type: string }, fullName: { type: string }, email: { type: string } } }
+  /admin/courses:
+    get:
+      operationId: listAdminCourses
+      summary: Administrator-only course directory
+      responses:
+        "200":
+          description: All courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - { $ref: "#/components/schemas/Course" }
+                    - { type: object, properties: { tutorId: { type: string } } }
+  /admin/courses/{courseId}:
+    patch:
+      operationId: updateAdminCourse
+      summary: Administrator-only course editing and tutor assignment
+      parameters:
+        - { name: courseId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminCourseInput" }
+      responses:
+        "200":
+          description: Updated course
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Course" }
+  /admin/subscriptions:
+    get:
+      operationId: listAdminSubscriptions
+      summary: Administrator-only subscription directory
+      responses:
+        "200":
+          description: Subscriptions with parent contact details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - { $ref: "#/components/schemas/Enrollment" }
+                    - { type: object, properties: { parentName: { type: string }, parentEmail: { type: string } } }
+  /admin/subscriptions/{enrollmentId}/cancel:
+    post:
+      operationId: cancelAdminSubscription
+      summary: Administrator cancellation through the existing billing service
+      parameters:
+        - { name: enrollmentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Cancellation recorded
+          content:
+            application/json:
+              schema: { type: object, properties: { message: { type: string } } }
   /healthz:
     get:
       operationId: healthCheck
@@ -582,6 +690,38 @@ paths:
           description: Invalid byte range
 components:
   schemas:
+    AdminUserAccessInput:
+      type: object
+      required: [locked]
+      properties:
+        locked: { type: boolean }
+    AdminCourseInput:
+      type: object
+      required: [title, tutorId, gradeMin, gradeMax]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 200 }
+        tutorId: { type: string }
+        gradeMin: { type: integer, minimum: 8, maximum: 12 }
+        gradeMax: { type: integer, minimum: 8, maximum: 12 }
+        scheduleSummary: { type: ["string", "null"], maxLength: 1000 }
+    AdminOverview:
+      type: object
+      required: [accounts, courses, subscriptions, activeSubscriptions]
+      properties:
+        accounts: { type: integer }
+        courses: { type: integer }
+        subscriptions: { type: integer }
+        activeSubscriptions: { type: integer }
+    AdminUser:
+      type: object
+      required: [id, email, fullName, role, emailConfirmed, lockedOut]
+      properties:
+        id: { type: string }
+        email: { type: string }
+        fullName: { type: string }
+        role: { type: string }
+        emailConfirmed: { type: boolean }
+        lockedOut: { type: boolean }
     HealthStatus:
       type: object
       properties:
@@ -607,7 +747,7 @@ components:
         id: { type: string }
         fullName: { type: string }
         email: { type: string, format: email }
-        role: { type: string, enum: [parent, learner, tutor] }
+        role: { type: string, enum: [parent, learner, tutor, admin] }
         phone: { type: ["string", "null"] }
         grade: { type: ["integer", "null"] }
         createdAt: { type: string, format: date-time }
@@ -616,14 +756,14 @@ components:
       required: [fullName, role]
       properties:
         fullName: { type: string, minLength: 2 }
-        role: { type: string, enum: [parent, learner, tutor] }
+        role: { type: string, enum: [parent, learner, tutor, admin] }
         phone: { type: ["string", "null"] }
         grade: { type: ["integer", "null"], minimum: 8, maximum: 12 }
     Overview:
       type: object
       required: [role, upcomingSessions, activeSubjects, totalLearners, recentActivity]
       properties:
-        role: { type: string, enum: [parent, learner, tutor] }
+        role: { type: string, enum: [parent, learner, tutor, admin] }
         upcomingSessions: { type: integer }
         activeSubjects: { type: integer }
         totalLearners: { type: integer }

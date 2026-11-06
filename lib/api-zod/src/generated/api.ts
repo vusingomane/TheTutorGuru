@@ -9,6 +9,149 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Administrator-only platform counts
+ */
+export const GetAdminOverviewResponse = zod.object({
+  "accounts": zod.number().int(),
+  "courses": zod.number().int(),
+  "subscriptions": zod.number().int(),
+  "activeSubscriptions": zod.number().int()
+})
+
+
+/**
+ * @summary Administrator-only account directory without credentials
+ */
+export const ListAdminUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "fullName": zod.string(),
+  "role": zod.string(),
+  "emailConfirmed": zod.boolean(),
+  "lockedOut": zod.boolean()
+})
+export const ListAdminUsersResponse = zod.array(ListAdminUsersResponseItem)
+
+
+/**
+ * @summary Suspend or restore a non-administrator account
+ */
+export const UpdateAdminUserAccessParams = zod.object({
+  "identityId": zod.coerce.string()
+})
+
+export const UpdateAdminUserAccessBody = zod.object({
+  "locked": zod.boolean()
+})
+
+export const UpdateAdminUserAccessResponse = zod.object({
+  "message": zod.string().optional()
+})
+
+
+/**
+ * @summary Administrator-only tutor directory for course assignment
+ */
+export const ListAdminTutorsResponseItem = zod.object({
+  "id": zod.string().optional(),
+  "fullName": zod.string().optional(),
+  "email": zod.string().optional()
+})
+export const ListAdminTutorsResponse = zod.array(ListAdminTutorsResponseItem)
+
+
+/**
+ * @summary Administrator-only course directory
+ */
+export const ListAdminCoursesResponseItem = zod.object({
+  "id": zod.string(),
+  "subjectId": zod.string(),
+  "subjectName": zod.string(),
+  "title": zod.string(),
+  "gradeMin": zod.number().int(),
+  "gradeMax": zod.number().int(),
+  "tutorName": zod.string(),
+  "scheduleSummary": zod.string().nullish()
+}).and(zod.object({
+  "tutorId": zod.string().optional()
+}))
+export const ListAdminCoursesResponse = zod.array(ListAdminCoursesResponseItem)
+
+
+/**
+ * @summary Administrator-only course editing and tutor assignment
+ */
+export const UpdateAdminCourseParams = zod.object({
+  "courseId": zod.coerce.string().uuid()
+})
+
+export const updateAdminCourseBodyTitleMin = 2;
+export const updateAdminCourseBodyTitleMax = 200;
+
+export const updateAdminCourseBodyGradeMinMin = 8;
+export const updateAdminCourseBodyGradeMinMax = 12;
+
+export const updateAdminCourseBodyGradeMaxMin = 8;
+export const updateAdminCourseBodyGradeMaxMax = 12;
+
+export const updateAdminCourseBodyScheduleSummaryMax = 1000;
+
+
+
+export const UpdateAdminCourseBody = zod.object({
+  "title": zod.string().min(updateAdminCourseBodyTitleMin).max(updateAdminCourseBodyTitleMax),
+  "tutorId": zod.string(),
+  "gradeMin": zod.number().int().min(updateAdminCourseBodyGradeMinMin).max(updateAdminCourseBodyGradeMinMax),
+  "gradeMax": zod.number().int().min(updateAdminCourseBodyGradeMaxMin).max(updateAdminCourseBodyGradeMaxMax),
+  "scheduleSummary": zod.string().max(updateAdminCourseBodyScheduleSummaryMax).nullish()
+})
+
+export const UpdateAdminCourseResponse = zod.object({
+  "id": zod.string(),
+  "subjectId": zod.string(),
+  "subjectName": zod.string(),
+  "title": zod.string(),
+  "gradeMin": zod.number().int(),
+  "gradeMax": zod.number().int(),
+  "tutorName": zod.string(),
+  "scheduleSummary": zod.string().nullish()
+})
+
+
+/**
+ * @summary Administrator-only subscription directory
+ */
+export const ListAdminSubscriptionsResponseItem = zod.object({
+  "id": zod.string(),
+  "learnerId": zod.string().nullable(),
+  "learnerName": zod.string(),
+  "learnerGrade": zod.number().int(),
+  "subjectIds": zod.array(zod.string()),
+  "monthlyAmountZar": zod.number().int(),
+  "status": zod.enum(['pending', 'active', 'cancelling', 'cancelled', 'past_due']),
+  "paymentStatus": zod.enum(['awaiting_provider', 'paid', 'failed', 'pending', 'refunded']),
+  "periodEndsAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+}).and(zod.object({
+  "parentName": zod.string().optional(),
+  "parentEmail": zod.string().optional()
+}))
+export const ListAdminSubscriptionsResponse = zod.array(ListAdminSubscriptionsResponseItem)
+
+
+/**
+ * @summary Administrator cancellation through the existing billing service
+ */
+export const CancelAdminSubscriptionParams = zod.object({
+  "enrollmentId": zod.coerce.string().uuid()
+})
+
+export const CancelAdminSubscriptionResponse = zod.object({
+  "message": zod.string().optional()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -37,7 +180,7 @@ export const GetProfileResponse = zod.object({
   "id": zod.string(),
   "fullName": zod.string(),
   "email": zod.string().email(),
-  "role": zod.enum(['parent', 'learner', 'tutor']),
+  "role": zod.enum(['parent', 'learner', 'tutor', 'admin']),
   "phone": zod.string().nullish(),
   "grade": zod.number().int().nullish(),
   "createdAt": zod.coerce.date()
@@ -56,7 +199,7 @@ export const saveProfileBodyGradeMax = 12;
 
 export const SaveProfileBody = zod.object({
   "fullName": zod.string().min(saveProfileBodyFullNameMin),
-  "role": zod.enum(['parent', 'learner', 'tutor']),
+  "role": zod.enum(['parent', 'learner', 'tutor', 'admin']),
   "phone": zod.string().nullish(),
   "grade": zod.number().int().min(saveProfileBodyGradeMin).max(saveProfileBodyGradeMax).nullish()
 })
@@ -65,7 +208,7 @@ export const SaveProfileResponse = zod.object({
   "id": zod.string(),
   "fullName": zod.string(),
   "email": zod.string().email(),
-  "role": zod.enum(['parent', 'learner', 'tutor']),
+  "role": zod.enum(['parent', 'learner', 'tutor', 'admin']),
   "phone": zod.string().nullish(),
   "grade": zod.number().int().nullish(),
   "createdAt": zod.coerce.date()
@@ -76,7 +219,7 @@ export const SaveProfileResponse = zod.object({
  * @summary Get a role-specific dashboard summary
  */
 export const GetOverviewResponse = zod.object({
-  "role": zod.enum(['parent', 'learner', 'tutor']),
+  "role": zod.enum(['parent', 'learner', 'tutor', 'admin']),
   "upcomingSessions": zod.number().int(),
   "activeSubjects": zod.number().int(),
   "totalLearners": zod.number().int(),

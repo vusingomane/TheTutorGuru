@@ -1,0 +1,223 @@
+@page "/admin"
+@inherits GuruPage
+
+@if (Ready && Api.Role != "admin")
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="py-12">
+        <Empty Icon="@Icons.Material.Filled.Lock" Title="Administrators only" Text="Your account does not have access to the admin console." />
+        <MudStack Row Justify="Justify.Center" Class="mt-4"><MudButton Href="/dashboard" Variant="Variant.Filled" Color="Color.Primary">Back to dashboard</MudButton></MudStack>
+    </MudContainer>
+}
+else
+{
+<Frame Title="Admin console" Subtitle="Accounts, courses and subscriptions across TheTutorGuru." Loading="Loading" Error="@LoadError" OnRetry="Reload">
+    <MudGrid Spacing="2" Class="mb-4">
+        @foreach (var (label, key, icon) in _stats)
+        {
+            <MudItem xs="6" md="3">
+                <MudPaper Elevation="0" Class="pa-4" Style="border:1px solid #ddd3bd;border-left:4px solid #f5b83d">
+                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.overline">@label</MudText>
+                        <MudIcon Icon="@icon" Size="Size.Small" Color="Color.Primary" />
+                    </MudStack>
+                    <MudText Typo="Typo.h4">@_overview.I(key)</MudText>
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <MudTabs Elevation="0" Rounded ApplyEffectsToContainer PanelClass="pt-4" Color="Color.Primary" SliderColor="Color.Secondary">
+        <MudTabPanel Text="@($"Accounts ({_users.Count})")" Icon="@Icons.Material.Filled.People">
+            <MudTextField @bind-Value="_userQ" Immediate Placeholder="Search name, email or role" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" aria-label="Search accounts" />
+            @if (_users.Count == 0) { <Empty Icon="@Icons.Material.Filled.People" Title="No accounts" Text="Registered accounts will appear here." /> }
+            else
+            {
+                <MudTable Items="FilteredUsers" Dense Hover Elevation="0" Breakpoint="Breakpoint.Sm" Style="border:1px solid #ddd3bd">
+                    <HeaderContent><MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>Role</MudTh><MudTh>Email verified</MudTh><MudTh>Access</MudTh><MudTh Style="text-align:right">Action</MudTh></HeaderContent>
+                    <RowTemplate>
+                        @{ var isAdmin = context.S("role") == "admin"; var locked = context.B("lockedOut"); var id = context.S("id"); }
+                        <MudTd DataLabel="Name"><b>@(string.IsNullOrEmpty(context.S("fullName")) ? "No profile" : context.S("fullName"))</b></MudTd>
+                        <MudTd DataLabel="Email">@context.S("email")</MudTd>
+                        <MudTd DataLabel="Role"><MudChip T="string" Size="Size.Small" Color="@(isAdmin ? Color.Secondary : Color.Default)">@(string.IsNullOrEmpty(context.S("role")) ? "none" : context.S("role"))</MudChip></MudTd>
+                        <MudTd DataLabel="Email verified">@if (context.B("emailConfirmed")) { <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" Title="Verified" /> } else { <MudText Typo="Typo.caption" Color="Color.Warning">Unverified</MudText> }</MudTd>
+                        <MudTd DataLabel="Access"><MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(locked ? Color.Error : Color.Success)">@(locked ? "Locked" : "Active")</MudChip></MudTd>
+                        <MudTd DataLabel="Action" Style="text-align:right">
+                            @if (isAdmin) { <MudTooltip Text="Administrator accounts cannot be locked here"><MudButton Size="Size.Small" Disabled>Protected</MudButton></MudTooltip> }
+                            else
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="@(locked ? Color.Success : Color.Error)" Disabled="_busy.Contains(id)"
+                                           StartIcon="@(locked ? Icons.Material.Filled.LockOpen : Icons.Material.Filled.Lock)" OnClick="() => ToggleLock(context)">
+                                    @(_busy.Contains(id) ? "Saving..." : locked ? "Unlock" : "Lock")
+                                </MudButton>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="@($"Courses ({_courses.Count})")" Icon="@Icons.Material.Filled.MenuBook">
+            @if (_edit != null)
+            {
+                <MudPaper Elevation="0" Class="pa-4 mb-4" Style="border:2px solid #f5b83d">
+                    <MudText Typo="Typo.h6" Class="mb-1">Edit course</MudText>
+                    <MudText Typo="Typo.caption" Class="mb-3 d-block">@_edit.S("subjectName")</MudText>
+                    @if (_editError != null) { <MudAlert Severity="Severity.Error" Dense Class="mb-3">@_editError</MudAlert> }
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="6"><MudTextField @bind-Value="_fTitle" Label="Title" Variant="Variant.Outlined" Required MaxLength="200" /></MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="_fTutor" Label="Tutor" Variant="Variant.Outlined" Required>
+                                @foreach (var t in _tutors) { <MudSelectItem Value="@t.S("id")">@t.S("fullName") (@t.S("email"))</MudSelectItem> }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="6" md="3"><MudNumericField @bind-Value="_fMin" Label="Grade from" Min="8" Max="12" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="6" md="3"><MudNumericField @bind-Value="_fMax" Label="Grade to" Min="8" Max="12" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" md="6"><MudTextField @bind-Value="_fSchedule" Label="Schedule summary (optional)" Variant="Variant.Outlined" Placeholder="e.g. Tuesdays 17:00" /></MudItem>
+                    </MudGrid>
+                    <MudStack Row Justify="Justify.FlexEnd" Class="mt-3">
+                        <MudButton OnClick="() => _edit = null" Disabled="_saving">Cancel</MudButton>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveCourse" Disabled="_saving">@(_saving ? "Saving..." : "Save changes")</MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+            @if (_courses.Count == 0) { <Empty Icon="@Icons.Material.Filled.MenuBook" Title="No courses" Text="Courses will appear here once created." /> }
+            else
+            {
+                <MudTable Items="_courses" Dense Hover Elevation="0" Breakpoint="Breakpoint.Sm" Style="border:1px solid #ddd3bd">
+                    <HeaderContent><MudTh>Course</MudTh><MudTh>Subject</MudTh><MudTh>Grades</MudTh><MudTh>Tutor</MudTh><MudTh>Schedule</MudTh><MudTh Style="text-align:right">Action</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Course"><b>@context.S("title")</b></MudTd>
+                        <MudTd DataLabel="Subject">@context.S("subjectName")</MudTd>
+                        <MudTd DataLabel="Grades">@context.I("gradeMin")&ndash;@context.I("gradeMax")</MudTd>
+                        <MudTd DataLabel="Tutor">@(string.IsNullOrEmpty(context.S("tutorName")) ? "Unassigned" : context.S("tutorName"))</MudTd>
+                        <MudTd DataLabel="Schedule">@(string.IsNullOrEmpty(context.S("scheduleSummary")) ? "—" : context.S("scheduleSummary"))</MudTd>
+                        <MudTd DataLabel="Action" Style="text-align:right"><MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="() => StartEdit(context)">Edit</MudButton></MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="@($"Subscriptions ({_subs.Count})")" Icon="@Icons.Material.Filled.CreditCard">
+            @if (_subs.Count == 0) { <Empty Icon="@Icons.Material.Filled.CreditCard" Title="No subscriptions" Text="Parent subscriptions will appear here." /> }
+            else
+            {
+                <MudTable Items="_subs" Dense Hover Elevation="0" Breakpoint="Breakpoint.Sm" Style="border:1px solid #ddd3bd">
+                    <HeaderContent><MudTh>Learner</MudTh><MudTh>Parent</MudTh><MudTh>Subjects</MudTh><MudTh>Monthly</MudTh><MudTh>Status</MudTh><MudTh>Payment</MudTh><MudTh>Period ends</MudTh><MudTh Style="text-align:right">Action</MudTh></HeaderContent>
+                    <RowTemplate>
+                        @{ var st = context.S("status"); var id = context.S("id"); }
+                        <MudTd DataLabel="Learner"><b>@context.S("learnerName")</b> <MudText Typo="Typo.caption">Gr @context.I("learnerGrade")</MudText></MudTd>
+                        <MudTd DataLabel="Parent">@context.S("parentName")<br /><MudText Typo="Typo.caption">@context.S("parentEmail")</MudText></MudTd>
+                        <MudTd DataLabel="Subjects">@context.L("subjectIds").Count</MudTd>
+                        <MudTd DataLabel="Monthly">R @context.D("monthlyAmountZar").ToString("N2")</MudTd>
+                        <MudTd DataLabel="Status"><MudChip T="string" Size="Size.Small" Color="@StatusColor(st)">@st</MudChip></MudTd>
+                        <MudTd DataLabel="Payment">@context.S("paymentStatus")</MudTd>
+                        <MudTd DataLabel="Period ends">@(string.IsNullOrEmpty(context.S("periodEndsAt")) ? "—" : J.Date(context.S("periodEndsAt")))</MudTd>
+                        <MudTd DataLabel="Action" Style="text-align:right">
+                            @if (Cancellable(st))
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error" Disabled="_busy.Contains(id)" OnClick="() => CancelSub(context)">@(_busy.Contains(id) ? "Cancelling..." : "Cancel")</MudButton>
+                            }
+                            else { <MudText Typo="Typo.caption">—</MudText> }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+    </MudTabs>
+</Frame>
+}
+
+@code {
+    static readonly (string, string, string)[] _stats =
+    {
+        ("Accounts", "accounts", Icons.Material.Filled.People), ("Courses", "courses", Icons.Material.Filled.MenuBook),
+        ("Subscriptions", "subscriptions", Icons.Material.Filled.CreditCard), ("Active", "activeSubscriptions", Icons.Material.Filled.CheckCircle)
+    };
+    JsonNode? _overview;
+    List<JsonNode> _users = new(), _courses = new(), _tutors = new(), _subs = new();
+    readonly HashSet<string> _busy = new();
+    string _userQ = "";
+    JsonNode? _edit; string? _editError; bool _saving;
+    string _fTitle = "", _fTutor = ""; string? _fSchedule; int _fMin = 8, _fMax = 12;
+
+    IEnumerable<JsonNode> FilteredUsers => string.IsNullOrWhiteSpace(_userQ) ? _users
+        : _users.Where(u => (u.S("fullName") + " " + u.S("email") + " " + u.S("role")).Contains(_userQ.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task Load()
+    {
+        _overview = null; _users = new(); _courses = new(); _tutors = new(); _subs = new();
+        if (Api.Role != "admin") return;
+        var o = Api.Send("/admin/overview"); var u = Api.Send("/admin/users"); var c = Api.Send("/admin/courses");
+        var t = Api.Send("/admin/tutors"); var s = Api.Send("/admin/subscriptions");
+        await Task.WhenAll(o, u, c, t, s);
+        _overview = o.Result; _users = u.Result.L(); _courses = c.Result.L(); _tutors = t.Result.L(); _subs = s.Result.L();
+    }
+
+    async Task RefreshOverview() { try { _overview = await Api.Send("/admin/overview"); } catch (Exception e) { Snack.Add(e.Message, Severity.Warning); } }
+
+    async Task ToggleLock(JsonNode u)
+    {
+        if (u.S("role") == "admin") return;
+        var id = u.S("id"); var lockIt = !u.B("lockedOut");
+        if (lockIt && !await Confirm("Lock account?", $"{u.S("email")} will be unable to sign in until unlocked.")) return;
+        _busy.Add(id);
+        await Run(async () =>
+        {
+            var r = await Api.Send($"/admin/users/{Uri.EscapeDataString(id)}/access", "PATCH", new { locked = lockIt });
+            Snack.Add(r.S("message") is { Length: > 0 } m ? m : (lockIt ? "Account locked." : "Account unlocked."), Severity.Success);
+            _users = (await Api.Send("/admin/users")).L();
+            await RefreshOverview();
+        });
+        _busy.Remove(id);
+    }
+
+    void StartEdit(JsonNode c)
+    {
+        _edit = c; _editError = null;
+        _fTitle = c.S("title"); _fTutor = c.S("tutorId"); _fMin = c.I("gradeMin"); _fMax = c.I("gradeMax");
+        _fSchedule = c.S("scheduleSummary");
+    }
+
+    async Task SaveCourse()
+    {
+        if (_edit == null) return;
+        _editError = null;
+        if (string.IsNullOrWhiteSpace(_fTitle)) { _editError = "Enter a course title."; return; }
+        if (string.IsNullOrEmpty(_fTutor)) { _editError = "Choose a tutor."; return; }
+        if (_fMin < 8 || _fMax > 12 || _fMin > _fMax) { _editError = "Grades must be between 8 and 12, with 'from' not above 'to'."; return; }
+        _saving = true;
+        try
+        {
+            await Api.Send($"/admin/courses/{Uri.EscapeDataString(_edit.S("id"))}", "PATCH",
+                new { title = _fTitle.Trim(), tutorId = _fTutor, gradeMin = _fMin, gradeMax = _fMax, scheduleSummary = string.IsNullOrWhiteSpace(_fSchedule) ? null : _fSchedule.Trim() });
+            Snack.Add("Course updated.", Severity.Success);
+            _edit = null;
+            try { _courses = (await Api.Send("/admin/courses")).L(); } catch (Exception e) { Snack.Add(e.Message, Severity.Warning); }
+            await RefreshOverview();
+        }
+        catch (Exception e) { _editError = e.Message; }
+        _saving = false;
+    }
+
+    static bool Cancellable(string s) => s is not ("cancelled" or "canceled" or "expired" or "ended");
+    static Color StatusColor(string s) => s switch { "active" => Color.Success, "pending" => Color.Warning, "cancelled" or "canceled" or "expired" => Color.Default, _ => Color.Info };
+
+    async Task CancelSub(JsonNode s)
+    {
+        var id = s.S("id");
+        var msg = s.S("status") == "pending"
+            ? $"This pending request for {s.S("learnerName")} will be cancelled immediately. No payment will be taken."
+            : $"This stops future renewals for {s.S("learnerName")}. Paid access remains until the current period ends" +
+              (string.IsNullOrEmpty(s.S("periodEndsAt")) ? "." : $" ({J.Date(s.S("periodEndsAt"))}).") + " No refund is issued.";
+        if (!await Confirm("Cancel subscription?", msg)) return;
+        _busy.Add(id);
+        await Run(async () =>
+        {
+            var r = await Api.Send($"/admin/subscriptions/{Uri.EscapeDataString(id)}/cancel", "POST", new { });
+            Snack.Add(r.S("message") is { Length: > 0 } m ? m : "Subscription cancelled.", Severity.Success);
+            _subs = (await Api.Send("/admin/subscriptions")).L();
+            await RefreshOverview();
+        });
+        _busy.Remove(id);
+    }
+}

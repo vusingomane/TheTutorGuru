@@ -30,6 +30,7 @@ router.get("/profile", async (req, res) => {
 router.put("/profile", async (req, res) => {
   const data = SaveProfileBody.parse(req.body);
   const [existing] = await query(`${profileSelect} WHERE id=$1`, [req.guruUserId]);
+  if (data.role === "admin" && existing?.role !== "admin") throw new HttpError(403, "Administrator access cannot be chosen during account setup.");
   if (existing && existing.role !== data.role) throw new HttpError(409, "Your account role cannot be changed after setup.");
   if (data.role === "learner" && data.grade == null) throw new HttpError(400, "Choose your school grade.");
   const user = await clerkClient.users.getUser(req.guruUserId!);

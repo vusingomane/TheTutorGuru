@@ -24,7 +24,8 @@ public static class AccountEndpoints
         app.MapPut("/api/profile", async (ProfileInput body, HttpContext c, Database db, UserManager<IdentityUser> users, IWebHostEnvironment env) =>
         {
             Tutoring.Text(body.FullName, "full name", 2, 200);
-            if (!new[] { "parent", "learner", "tutor" }.Contains(body.Role)) throw new HttpError(400, "Choose parent, learner, or tutor.");
+            var administrator = body.Role == "admin" && (await db.One("SELECT role FROM guru_profiles WHERE id=$1", Tutoring.Id(c)))?["role"]?.ToString() == "admin";
+            if (!administrator && !new[] { "parent", "learner", "tutor" }.Contains(body.Role)) throw new HttpError(400, "Choose parent, learner, or tutor.");
             if (body.Role == "learner" && body.Grade is null) throw new HttpError(400, "Choose your school grade.");
             if (body.Grade.HasValue) Tutoring.Grade(body.Grade.Value);
             var user = await users.GetUserAsync(c.User);

@@ -13,4 +13,5 @@ export const ProfileRole = {
   parent: 'parent',
   learner: 'learner',
   tutor: 'tutor',
+  admin: 'admin',
 } as const;
