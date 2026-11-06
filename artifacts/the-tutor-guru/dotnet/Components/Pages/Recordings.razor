@@ -23,7 +23,7 @@
         @foreach (var r in _items)
         {
             <MudItem xs="12" md="6"><MudPaper Elevation="0" Class="pa-3" Style="border:1px solid #ddd3bd">
-                <video controls preload="metadata" style="width:100%;border-radius:6px;background:#10393a" src="@GuruApi.FileUrl(r.S("objectPath"))"></video>
+                <video controls preload="metadata" style="width:100%;border-radius:6px;background:#102744" src="@GuruApi.FileUrl(r.S("objectPath"))"></video>
                 <MudText Typo="Typo.subtitle1" Class="mt-2">@r.S("title")</MudText>
                 <MudText Typo="Typo.body2">@r.S("courseTitle") &middot; @r.S("sessionTitle") &middot; @(r.I("durationSeconds") / 60) min &middot; @J.Date(r.S("uploadedAt"))</MudText>
             </MudPaper></MudItem>
