@@ -10,8 +10,12 @@ public sealed class AdminProvisioner(Database db, UserManager<IdentityUser> user
     {
         var email = Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_EMAIL")?.Trim().ToLowerInvariant();
         var password = Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_PASSWORD");
-        if (string.IsNullOrWhiteSpace(email) || !System.Net.Mail.MailAddress.TryCreate(email, out _) || string.IsNullOrEmpty(password))
-            throw new InvalidOperationException("Administrator setup requires a valid ADMIN_BOOTSTRAP_EMAIL and a secure ADMIN_BOOTSTRAP_PASSWORD.");
+        if (string.IsNullOrWhiteSpace(email))
+            throw new AdminSetupException("MissingEmailConfiguration");
+        if (!System.Net.Mail.MailAddress.TryCreate(email, out _))
+            throw new AdminSetupException("InvalidEmailConfiguration");
+        if (string.IsNullOrEmpty(password))
+            throw new AdminSetupException("MissingPasswordConfiguration");
 
         await using var connection = await db.Open();
         await connection.ExecuteAsync("SELECT pg_advisory_lock(94223003)");
@@ -32,33 +36,28 @@ public sealed class AdminProvisioner(Database db, UserManager<IdentityUser> user
                 }
                 // Never overwrite an existing password or silently take over an account.
                 if (!await users.CheckPasswordAsync(user, password))
-                    throw new InvalidOperationException("Administrator account already exists with a different password. No changes made.");
+                    throw new AdminSetupException("ExistingAccountPasswordMismatch");
             }
             else
             {
                 // Explicit owner-authorized provisioning, not public registration.
                 user = new IdentityUser { Email = email, UserName = email, EmailConfirmed = true, LockoutEnabled = true };
-                Ensure(await users.CreateAsync(user, password));
+                AdminSetupException.Ensure(await users.CreateAsync(user, password), "IdentityAccountCreationFailed");
                 profileId = user.Id;
             }
             if (!user.EmailConfirmed)
             {
                 user.EmailConfirmed = true;
-                Ensure(await users.UpdateAsync(user));
+                AdminSetupException.Ensure(await users.UpdateAsync(user), "IdentityConfirmationFailed");
             }
             await db.Query("""
                 INSERT INTO guru_profiles(id,full_name,email,role) VALUES($1,'Platform Administrator',$2,'admin')
                 ON CONFLICT(id) DO UPDATE SET role='admin'
                 """, profileId, email);
-            Ensure(await users.UpdateSecurityStampAsync(user));
+            AdminSetupException.Ensure(await users.UpdateSecurityStampAsync(user), "IdentitySecurityStampUpdateFailed");
             log.LogInformation("Owner-authorized administrator provisioned. No credentials were logged.");
         }
         finally { await connection.ExecuteAsync("SELECT pg_advisory_unlock(94223003)"); }
     }
 
-    private static void Ensure(IdentityResult result)
-    {
-        if (!result.Succeeded)
-            throw new InvalidOperationException("Administrator setup failed: " + string.Join(" ", result.Errors.Select(e => e.Code)));
-    }
 }

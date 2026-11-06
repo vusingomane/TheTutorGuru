@@ -91,8 +91,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 var app = builder.Build();
 if (args.Contains("--bootstrap-admin"))
 {
-    using var scope = app.Services.CreateScope();
-    await scope.ServiceProvider.GetRequiredService<AdminProvisioner>().Provision();
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<AdminProvisioner>().Provision();
+    }
+    catch (Exception e)
+    {
+        LogAdminSetupFailure(app.Logger, e);
+        Environment.ExitCode = 1;
+    }
     return;
 }
 if (app.Environment.IsProduction() && Environment.GetEnvironmentVariable("ADMIN_BOOTSTRAP_ENABLED") == "true")
@@ -105,7 +113,7 @@ if (app.Environment.IsProduction() && Environment.GetEnvironmentVariable("ADMIN_
     catch (Exception e)
     {
         // Keep the existing site serving; never log credentials or account data.
-        app.Logger.LogError("Administrator setup did not complete ({Type}). Review secure bootstrap configuration.", e.GetType().Name);
+        LogAdminSetupFailure(app.Logger, e);
     }
 }
 app.UseForwardedHeaders();
@@ -151,3 +159,18 @@ app.MapResources();
 app.MapBilling();
 app.MapAdmin();
 app.Run();
+
+static void LogAdminSetupFailure(ILogger logger, Exception error)
+{
+    if (error is AdminSetupException setup)
+        logger.LogError("Administrator setup did not complete. Category={Category}; IdentityCodes={IdentityCodes}. No credentials or account details logged.",
+            setup.Category, setup.IdentityCodes);
+    else if (error is PostgresException postgres)
+        logger.LogError("Administrator setup did not complete. Category=DatabaseFailure; SqlState={SqlState}. No database message or account details logged.",
+            postgres.SqlState);
+    else if (error is NpgsqlException)
+        logger.LogError("Administrator setup did not complete. Category=DatabaseConnectionFailure. No connection details logged.");
+    else
+        logger.LogError("Administrator setup did not complete. Category=UnexpectedFailure; Type={Type}. No exception message or account details logged.",
+            error.GetType().Name);
+}

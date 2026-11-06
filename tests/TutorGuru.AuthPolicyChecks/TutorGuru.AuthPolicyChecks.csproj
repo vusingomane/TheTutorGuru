@@ -8,5 +8,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Compile Include="../../artifacts/api-server/dotnet/Identity/EmailVerificationPolicy.cs" Link="EmailVerificationPolicy.cs" />
+    <Compile Include="../../artifacts/api-server/dotnet/Identity/AdminSetupException.cs" Link="AdminSetupException.cs" />
   </ItemGroup>
 </Project>
