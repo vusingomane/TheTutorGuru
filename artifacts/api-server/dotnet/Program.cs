@@ -26,6 +26,7 @@ builder.Services.AddScoped<Tutoring>();
 builder.Services.AddScoped<ObjectStorage>();
 builder.Services.AddScoped<MailService>();
 builder.Services.AddScoped<AdminProvisioner>();
+builder.Services.AddScoped<IUserConfirmation<IdentityUser>, AccountActivation>();
 builder.Services.AddSingleton<PayGateOptions>();
 builder.Services.AddScoped<PayGateClient>();
 builder.Services.AddScoped<BillingService>();
@@ -38,7 +39,8 @@ builder.Services.AddIdentityCore<IdentityUser>(options =>
 {
     options.User.RequireUniqueEmail = true;
     options.Password.RequiredLength = 10;
-    options.SignIn.RequireConfirmedEmail = EmailVerificationPolicy.IsRequired(builder.Environment);
+    options.SignIn.RequireConfirmedEmail = false;
+    options.SignIn.RequireConfirmedAccount = true;
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
 }).AddUserStore<DapperUserStore>().AddSignInManager().AddDefaultTokenProviders();

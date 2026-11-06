@@ -5,9 +5,9 @@ namespace TutorGuru.Api.Identity;
 
 public static class EmailVerificationPolicy
 {
-    // Only Development may bypass verification. Production, Staging, and
-    // unknown environments must continue to require a confirmed address.
-    public static bool IsRequired(IHostEnvironment environment) => !environment.IsDevelopment();
+    // Email verification is replaced by administrator activation in every environment.
+    // Activation is enforced by Identity confirmation and protected API access.
+    public static bool IsRequired(IHostEnvironment environment) => false;
 
     public static bool CanCompleteProfile(IdentityUser? user, IHostEnvironment environment) =>
         user is not null && (user.EmailConfirmed || !IsRequired(environment));

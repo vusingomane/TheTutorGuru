@@ -12,7 +12,6 @@
             <MudTextField T="string" @bind-Value="_pw" Label="Password" InputType="InputType.Password" Required Variant="Variant.Outlined" OnKeyDown="OnKey" />
         </MudForm>
         <MudButton FullWidth Class="mt-4" Variant="Variant.Filled" Color="Color.Primary" OnClick="Submit" Disabled="_busy">@(_busy ? "Signing in..." : "Sign in")</MudButton>
-        @if (_unconfirmed) { <MudButton FullWidth Class="mt-2" Variant="Variant.Outlined" OnClick="Resend" Disabled="_busy">Resend verification email</MudButton> }
         <MudStack Row Justify="Justify.SpaceBetween" Class="mt-4">
             <MudLink Href="/forgot-password">Forgot password?</MudLink>
             <MudLink Href="/sign-up">Create account</MudLink>
@@ -21,27 +20,20 @@
 </MudContainer>
 
 @code {
-    MudForm? _form; string _email = "", _pw = ""; string? _msg; bool _busy, _unconfirmed;
+    MudForm? _form; string _email = "", _pw = ""; string? _msg; bool _busy;
     async Task OnKey(KeyboardEventArgs e) { if (e.Key == "Enter") await Submit(); }
     async Task Submit()
     {
         if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrEmpty(_pw)) { _msg = "Enter your email and password."; return; }
-        _busy = true; _msg = null; _unconfirmed = false;
+        _busy = true; _msg = null;
         try
         {
             await Api.Send("/auth/login", "POST", new { email = _email.Trim(), password = _pw });
             await Api.RefreshProfile();
             Nav.NavigateTo(Api.Profile == null ? "/onboarding" : Api.Role == "admin" ? "/admin" : "/dashboard");
         }
-        catch (ApiException e) { _msg = e.Message; _unconfirmed = e.Status == 403 || e.Message.Contains("verif", StringComparison.OrdinalIgnoreCase) || e.Message.Contains("confirm", StringComparison.OrdinalIgnoreCase); }
+        catch (ApiException e) { _msg = e.Message; }
         catch (Exception e) { _msg = e.Message; }
-        _busy = false;
-    }
-    async Task Resend()
-    {
-        _busy = true;
-        try { await Api.Send("/auth/resend-confirmation", "POST", new { email = _email.Trim() }); Snack.Add("If that account needs verification, a new email has been sent.", Severity.Success); }
-        catch (Exception e) { Snack.Add(e.Message, Severity.Error); }
         _busy = false;
     }
 }

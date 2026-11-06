@@ -16,8 +16,9 @@ public static class AdminEndpoints
             if (Tutoring.Role(c) != "admin") throw new HttpError(403, "Administrator access is required.");
             var users = c.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
             var user = await users.GetUserAsync(c.User);
-            if (user?.EmailConfirmed != true || await users.IsLockedOutAsync(user))
-                throw new HttpError(403, "A verified, active administrator account is required.");
+            if (user is null || !await new TutorGuru.Api.Identity.AccountActivation(
+                    c.RequestServices.GetRequiredService<Database>()).IsConfirmedAsync(users, user) || await users.IsLockedOutAsync(user))
+                throw new HttpError(403, "An active administrator account is required.");
             return await next(invocation);
         });
         routes.MapGet("/overview", async (Database db) => Results.Json(await db.One("""
@@ -29,10 +30,24 @@ public static class AdminEndpoints
         routes.MapGet("/users", async (Database db) => Results.Json(await db.Query("""
             SELECT u.id,u.data->>'Email' AS email,coalesce(p.full_name,'Profile setup pending') AS "fullName",
             coalesce(p.role,'unassigned') AS role,coalesce((u.data->>'EmailConfirmed')::boolean,false) AS "emailConfirmed",
+            coalesce((u.data->>'PlatformActivated')::boolean,(u.data->>'EmailConfirmed')::boolean,false) AS activated,
             (coalesce((u.data->>'LockoutEnabled')::boolean,false) AND coalesce((u.data->>'LockoutEnd')::timestamptz,'-infinity')>now()) AS "lockedOut"
             FROM guru_identity_users u LEFT JOIN guru_identity_profile_links l ON l.identity_id=u.id
             LEFT JOIN guru_profiles p ON p.id=coalesce(l.profile_id,u.id) ORDER BY lower(u.data->>'Email')
             """)));
+        routes.MapPatch("/users/{identityId}/activation", async (string identityId, AdminActivationInput body, Database db, HttpContext c, UserManager<IdentityUser> users, ILoggerFactory logs) =>
+        {
+            if (body.Activated is not true) throw new HttpError(400, "Use account suspension to disable an active account.");
+            var user = await users.FindByIdAsync(identityId) ?? throw new HttpError(404, "Account not found.");
+            // Preserve password, email confirmation, role, and suspension state.
+            await db.Query("""
+                UPDATE guru_identity_users SET data=data || jsonb_build_object('PlatformActivated',true,'ConcurrencyStamp',$2::text),
+                    concurrency_stamp=$2 WHERE id=$1
+                """, identityId, Guid.NewGuid().ToString());
+            logs.CreateLogger("AdministratorAudit").LogInformation("Administrator {Actor} activated account {Target}",
+                c.User.FindFirstValue(ClaimTypes.NameIdentifier), identityId);
+            return Results.Json(new { message = "Account activated. The user can now sign in unless access is suspended." });
+        });
         routes.MapPatch("/users/{identityId}/access", async (string identityId, AdminAccessInput body, HttpContext c, Database db, UserManager<IdentityUser> users, ILoggerFactory logs) =>
         {
             var locked = body.Locked ?? throw new HttpError(400, "Choose whether to suspend or restore access.");
@@ -85,4 +100,5 @@ public static class AdminEndpoints
     { if (!result.Succeeded) throw new HttpError(409, "The account changed while saving. Refresh and try again."); }
 }
 public record AdminAccessInput(bool? Locked);
+public record AdminActivationInput(bool? Activated);
 public record AdminCourseInput(string Title, string TutorId, int GradeMin, int GradeMax, string? ScheduleSummary);

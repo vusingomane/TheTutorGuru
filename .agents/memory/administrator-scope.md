@@ -7,4 +7,4 @@ The product needs a full platform administrator, not a tutor account offered as 
 
 **Why:** The user explicitly selected “Full platform administrator” when asked which access level the requested account should have.
 
-**How to apply:** Keep administrator management separate from parent, learner, and tutor workflows. Owner-provisioned administrator setup does not authorize disabling email verification for ordinary production registrations. Never record account credentials or personal account details in project memory.
+**How to apply:** Keep administrator management separate from parent, learner, and tutor workflows. Ordinary registrations require administrator activation, not email verification, per the user's later activation policy. Never record account credentials or personal account details in project memory.

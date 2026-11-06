@@ -28,6 +28,8 @@ public sealed class Tutoring(Database db, IHostEnvironment environment, UserMana
         if (identityId is null) throw new HttpError(401, "Please sign in to continue.");
         var identity = await users.GetUserAsync(c.User);
         if (identity is null) throw new HttpError(401, "Please sign in to continue.");
+        if (!await new TutorGuru.Api.Identity.AccountActivation(db).IsConfirmedAsync(users, identity))
+            throw new HttpError(403, "Your account is awaiting activation by a platform administrator.");
         if (await users.IsLockedOutAsync(identity)) throw new HttpError(403, "This account's access is suspended.");
         var mapped = await db.One("SELECT profile_id FROM guru_identity_profile_links WHERE identity_id=$1", identityId);
         var id = mapped?["profile_id"]?.ToString() ?? identityId;

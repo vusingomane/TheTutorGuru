@@ -7,7 +7,7 @@ var checks = 0;
 foreach (var name in new[] { "Development", "Production", "Staging", "Unknown", "" })
 {
     var environment = new TestEnvironment { EnvironmentName = name };
-    var required = name != "Development";
+    var required = false;
     Check(EmailVerificationPolicy.IsRequired(environment) == required, $"{name}: sign-in policy");
     var unverified = new IdentityUser { EmailConfirmed = false };
     Check(EmailVerificationPolicy.CanCompleteProfile(unverified, environment) == !required, $"{name}: unverified profile policy");

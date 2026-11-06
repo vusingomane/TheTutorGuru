@@ -54,6 +54,10 @@ public sealed class AdminProvisioner(Database db, UserManager<IdentityUser> user
                 INSERT INTO guru_profiles(id,full_name,email,role) VALUES($1,'Platform Administrator',$2,'admin')
                 ON CONFLICT(id) DO UPDATE SET role='admin'
                 """, profileId, email);
+            // Explicit owner provisioning also approves an existing pending registration.
+            await db.Query("""
+                UPDATE guru_identity_users SET data=jsonb_set(data,'{PlatformActivated}','true'::jsonb) WHERE id=$1
+                """, user.Id);
             AdminSetupException.Ensure(await users.UpdateSecurityStampAsync(user), "IdentitySecurityStampUpdateFailed");
             log.LogInformation("Owner-authorized administrator provisioned. No credentials were logged.");
         }

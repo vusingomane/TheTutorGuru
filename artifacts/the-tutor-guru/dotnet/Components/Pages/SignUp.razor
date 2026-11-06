@@ -4,6 +4,7 @@
 <MudContainer MaxWidth="MaxWidth.ExtraSmall" Class="py-12">
     <MudPaper Class="pa-6" Elevation="0" Style="border:1px solid #ddd3bd">
         <MudText Typo="Typo.h4" Class="mb-4">Create your account</MudText>
+        <MudText Typo="Typo.body2" Class="mb-4">No email verification is required. A platform administrator must activate your account before you can sign in.</MudText>
         @if (_done != null) { <MudAlert Severity="Severity.Success" Class="mb-3">@_done</MudAlert> }
         else
         {
@@ -26,7 +27,7 @@
         if (_pw.Length < 10) { _err = "Password must be at least 10 characters, with uppercase and lowercase letters, a number, and a symbol."; return; }
         if (_pw != _pw2) { _err = "Passwords do not match."; return; }
         _busy = true;
-        try { var r = await Api.Send("/auth/register", "POST", new { email = _email.Trim(), password = _pw }); _done = r.S("message") is { Length: > 0 } m ? m : "Check your email to verify your account before signing in."; }
+        try { var r = await Api.Send("/auth/register", "POST", new { email = _email.Trim(), password = _pw }); _done = r.S("message") is { Length: > 0 } m ? m : "Account created. Please wait for a platform administrator to activate your account."; }
         catch (Exception e) { _err = e.Message; }
         _busy = false;
     }

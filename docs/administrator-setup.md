@@ -10,7 +10,15 @@ Set these production configuration values through the workspace's secure setting
 - `ADMIN_BOOTSTRAP_PASSWORD`: a new, strong password entered through Secrets, never code or chat.
 - `ADMIN_BOOTSTRAP_ENABLED`: `true`, only for the initial provisioning publish.
 
-On the next production startup, the app provisions the named administrator using ASP.NET Core Identity password hashing. This explicitly provisioned account is confirmed by the platform owner and can sign in without public email delivery. Other production registrations still require configured email delivery and verification.
+On the next production startup, the app provisions the named administrator using ASP.NET Core Identity password hashing. This explicitly provisioned account is approved by the platform owner and can sign in without public email delivery.
+
+## Registration and administrator activation
+
+Public registration requires neither Resend nor SMTP and sends no verification email. New accounts remain pending until an active platform administrator opens `/admin`, chooses **Accounts**, finds the account, clicks **Activate account**, and confirms. Only then can the user sign in and complete their profile. This policy applies in preview and production.
+
+Activation does not confirm email ownership or grant an administrator/tutor role. It is independent of suspension and password lockout: unlocking a pending account does not approve it, and activating a suspended account does not unlock it. Existing confirmed accounts retain access; previously unconfirmed accounts require approval. Old email verification links cannot activate accounts.
+
+Account activation is separate from password recovery. The existing email-based password reset still needs a working mail sender; registration and activation do not.
 
 Provisioning does not reset any existing password. If an account already exists, promotion requires the supplied password to match that account. Existing administrators are left unchanged. Legacy profile ownership is not transferred by matching an email address.
 
@@ -28,7 +36,7 @@ Startup and `--bootstrap-admin` report the same sanitized failure categories:
 - `DatabaseFailure`: includes only the PostgreSQL SQLSTATE, not the database message or query.
 - `DatabaseConnectionFailure` or `UnexpectedFailure`: no connection details or exception messages are logged.
 
-The CLI exits with status 1 on failure. Automatic production setup still leaves the site serving on failure. These diagnostics do not change password requirements, account privileges, or production email verification, and do not retry failed provisioning or database operations.
+The CLI exits with status 1 on failure. Automatic production setup still leaves the site serving on failure. These diagnostics do not change password requirements or account privileges and do not retry failed provisioning or database operations.
 
 ## Development check
 

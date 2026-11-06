@@ -16,11 +16,13 @@ public sealed class DapperUserStore(Database db) :
     public async Task<IdentityResult> CreateAsync(IdentityUser user, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        var data = JsonSerializer.SerializeToNode(user)!.AsObject();
+        data["PlatformActivated"] = user.EmailConfirmed;
         await using var c = await db.Open();
         try
         {
             await c.ExecuteAsync("INSERT INTO guru_identity_users(id,normalized_email,normalized_username,concurrency_stamp,data) VALUES(@Id,@NormalizedEmail,@NormalizedUserName,@ConcurrencyStamp,CAST(@Data AS jsonb))",
-                new { user.Id, user.NormalizedEmail, user.NormalizedUserName, user.ConcurrencyStamp, Data = JsonSerializer.Serialize(user) });
+                new { user.Id, user.NormalizedEmail, user.NormalizedUserName, user.ConcurrencyStamp, Data = data.ToJsonString() });
             return IdentityResult.Success;
         }
         catch (PostgresException e) when (e.SqlState == "23505")
@@ -32,7 +34,7 @@ public sealed class DapperUserStore(Database db) :
         var previous = user.ConcurrencyStamp;
         user.ConcurrencyStamp = Guid.NewGuid().ToString();
         await using var c = await db.Open();
-        var changed = await c.ExecuteAsync("UPDATE guru_identity_users SET normalized_email=@NormalizedEmail,normalized_username=@NormalizedUserName,concurrency_stamp=@ConcurrencyStamp,data=CAST(@Data AS jsonb) WHERE id=@Id AND concurrency_stamp=@Previous",
+        var changed = await c.ExecuteAsync("UPDATE guru_identity_users SET normalized_email=@NormalizedEmail,normalized_username=@NormalizedUserName,concurrency_stamp=@ConcurrencyStamp,data=data || CAST(@Data AS jsonb) WHERE id=@Id AND concurrency_stamp=@Previous",
             new { user.Id, user.NormalizedEmail, user.NormalizedUserName, user.ConcurrencyStamp, Previous = previous, Data = JsonSerializer.Serialize(user) });
         if (changed == 1) return IdentityResult.Success;
         user.ConcurrencyStamp = previous;

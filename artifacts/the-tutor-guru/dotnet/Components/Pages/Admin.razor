@@ -33,18 +33,22 @@ else
             else
             {
                 <MudTable Items="FilteredUsers" Dense Hover Elevation="0" Breakpoint="Breakpoint.Sm" Style="border:1px solid #ddd3bd">
-                    <HeaderContent><MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>Role</MudTh><MudTh>Email verified</MudTh><MudTh>Access</MudTh><MudTh Style="text-align:right">Action</MudTh></HeaderContent>
+                    <HeaderContent><MudTh>Name</MudTh><MudTh>Email</MudTh><MudTh>Role</MudTh><MudTh>Activation</MudTh><MudTh>Access</MudTh><MudTh Style="text-align:right">Action</MudTh></HeaderContent>
                     <RowTemplate>
                         @{ var isAdmin = context.S("role") == "admin"; var locked = context.B("lockedOut"); var id = context.S("id"); }
                         <MudTd DataLabel="Name"><b>@(string.IsNullOrEmpty(context.S("fullName")) ? "No profile" : context.S("fullName"))</b></MudTd>
                         <MudTd DataLabel="Email">@context.S("email")</MudTd>
                         <MudTd DataLabel="Role"><MudChip T="string" Size="Size.Small" Color="@(isAdmin ? Color.Secondary : Color.Default)">@(string.IsNullOrEmpty(context.S("role")) ? "none" : context.S("role"))</MudChip></MudTd>
-                        <MudTd DataLabel="Email verified">@if (context.B("emailConfirmed")) { <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" Title="Verified" /> } else { <MudText Typo="Typo.caption" Color="Color.Warning">Unverified</MudText> }</MudTd>
-                        <MudTd DataLabel="Access"><MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(locked ? Color.Error : Color.Success)">@(locked ? "Locked" : "Active")</MudChip></MudTd>
+                        <MudTd DataLabel="Activation"><MudText Typo="Typo.caption" Color="@(context.B("activated") ? Color.Success : Color.Warning)">@(context.B("activated") ? "Activated" : "Pending approval")</MudText></MudTd>
+                        <MudTd DataLabel="Access"><MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@(locked ? Color.Error : context.B("activated") ? Color.Success : Color.Warning)">@(locked ? "Locked" : context.B("activated") ? "Active" : "Pending activation")</MudChip></MudTd>
                         <MudTd DataLabel="Action" Style="text-align:right">
                             @if (isAdmin) { <MudTooltip Text="Administrator accounts cannot be locked here"><MudButton Size="Size.Small" Disabled>Protected</MudButton></MudTooltip> }
                             else
                             {
+                                @if (!context.B("activated"))
+                                {
+                                    <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Disabled="_busy.Contains(id)" OnClick="() => Activate(context)">Activate account</MudButton>
+                                }
                                 <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="@(locked ? Color.Success : Color.Error)" Disabled="_busy.Contains(id)"
                                            StartIcon="@(locked ? Icons.Material.Filled.LockOpen : Icons.Material.Filled.Lock)" OnClick="() => ToggleLock(context)">
                                     @(_busy.Contains(id) ? "Saving..." : locked ? "Unlock" : "Lock")
@@ -154,6 +158,20 @@ else
     }
 
     async Task RefreshOverview() { try { _overview = await Api.Send("/admin/overview"); } catch (Exception e) { Snack.Add(e.Message, Severity.Warning); } }
+
+    async Task Activate(JsonNode u)
+    {
+        var id = u.S("id");
+        if (!await Confirm("Activate account?", $"{u.S("email")} will be allowed to sign in. No email verification is required. Any existing suspension remains in place.")) return;
+        _busy.Add(id);
+        await Run(async () =>
+        {
+            var r = await Api.Send($"/admin/users/{Uri.EscapeDataString(id)}/activation", "PATCH", new { activated = true });
+            Snack.Add(r.S("message"), Severity.Success);
+            _users = (await Api.Send("/admin/users")).L();
+        });
+        _busy.Remove(id);
+    }
 
     async Task ToggleLock(JsonNode u)
     {

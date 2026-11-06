@@ -36,42 +36,29 @@ public static class AuthEndpoints
             var u = await users.GetUserAsync(c.User);
             return u is null ? Results.Json(new { error = "Please sign in." }, statusCode: 401) : Results.Json(new { email = u.Email, emailConfirmed = u.EmailConfirmed });
         }).DisableRateLimiting();
-        routes.MapPost("/register", async (AuthInput body, UserManager<IdentityUser> users, MailService mail, HttpContext c, IWebHostEnvironment env) =>
+        routes.MapPost("/register", async (AuthInput body, UserManager<IdentityUser> users) =>
         {
             body.Validate();
-            if (!mail.Available) throw new HttpError(503, "Account email delivery must be configured before registration.");
-            var origin = Origin(c, env);
             var user = new IdentityUser { UserName = body.Email.Trim().ToLowerInvariant(), Email = body.Email.Trim().ToLowerInvariant(), LockoutEnabled = true };
             var result = await users.CreateAsync(user, body.Password);
             if (!result.Succeeded) throw new HttpError(400, string.Join(" ", result.Errors.Select(e => e.Description)));
-            await mail.Send(user.Email, "Verify your TheTutorGuru email", $"{origin}/verify-email?userId={Uri.EscapeDataString(user.Id)}&token={Encode(await users.GenerateEmailConfirmationTokenAsync(user))}");
-            return Results.Json(new { message = env.IsDevelopment() ? "Account created. Email verification is skipped in this development preview. You can sign in now." : "Account created. Check your email to verify your address." }, statusCode: 201);
+            return Results.Json(new { message = "Account created. A platform administrator must activate your account before you can sign in. No email verification is required." }, statusCode: 201);
         });
         routes.MapPost("/login", async (AuthInput body, SignInManager<IdentityUser> signIn) =>
         {
             body.Validate();
             var result = await signIn.PasswordSignInAsync(body.Email.Trim().ToLowerInvariant(), body.Password, true, true);
-            if (!result.Succeeded) throw new HttpError(result.IsLockedOut ? 429 : 401, result.IsNotAllowed ? "Verify your email before signing in." : "Sign-in failed. Check your details or try again later.");
+            if (!result.Succeeded) throw new HttpError(result.IsLockedOut ? 429 : 401, result.IsNotAllowed ? "Your account is awaiting activation by a platform administrator." : "Sign-in failed. Check your details or try again later.");
             return Results.Json(new { message = "Signed in." });
         });
         routes.MapPost("/logout", async (SignInManager<IdentityUser> signIn) => { await signIn.SignOutAsync(); return Results.NoContent(); });
-        routes.MapPost("/confirm-email", async (TokenInput body, UserManager<IdentityUser> users) =>
+        routes.MapPost("/confirm-email", () =>
         {
-            body.Validate();
-            var u = await users.FindByIdAsync(body.UserId);
-            if (u is null || u.EmailConfirmed || !(await users.ConfirmEmailAsync(u, Decode(body.Token))).Succeeded)
-                throw new HttpError(400, "The verification link is invalid, expired, or already used.");
-            return Results.Json(new { message = "Email verified. You can now sign in." });
+            return Results.Json(new { error = "Email verification is no longer used. Ask a platform administrator to activate your account." }, statusCode: 410);
         });
-        routes.MapPost("/resend-confirmation", async (EmailInput body, UserManager<IdentityUser> users, MailService mail, HttpContext c, IWebHostEnvironment env) =>
+        routes.MapPost("/resend-confirmation", () =>
         {
-            body.Validate();
-            if (!mail.Available) throw new HttpError(503, "Account email delivery is not configured.");
-            var origin = Origin(c, env);
-            var u = await users.FindByEmailAsync(body.Email.Trim().ToLowerInvariant());
-            if (u is not null && !u.EmailConfirmed)
-                await mail.Send(u.Email!, "Verify your TheTutorGuru email", $"{origin}/verify-email?userId={Uri.EscapeDataString(u.Id)}&token={Encode(await users.GenerateEmailConfirmationTokenAsync(u))}");
-            return Results.Json(new { message = "If this account needs verification, a new link has been sent. Development mail is held privately for the workspace operator." });
+            return Results.Json(new { error = "No verification email is needed. Ask a platform administrator to activate your account." }, statusCode: 410);
         });
         routes.MapPost("/forgot-password", async (EmailInput body, UserManager<IdentityUser> users, MailService mail, HttpContext c, IWebHostEnvironment env) =>
         {
