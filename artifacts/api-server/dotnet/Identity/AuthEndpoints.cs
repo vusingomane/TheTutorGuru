@@ -45,7 +45,7 @@ public static class AuthEndpoints
             var result = await users.CreateAsync(user, body.Password);
             if (!result.Succeeded) throw new HttpError(400, string.Join(" ", result.Errors.Select(e => e.Description)));
             await mail.Send(user.Email, "Verify your TheTutorGuru email", $"{origin}/verify-email?userId={Uri.EscapeDataString(user.Id)}&token={Encode(await users.GenerateEmailConfirmationTokenAsync(user))}");
-            return Results.Json(new { message = env.IsDevelopment() ? "Account created. Ask the workspace operator for the development verification email." : "Account created. Check your email to verify your address." }, statusCode: 201);
+            return Results.Json(new { message = env.IsDevelopment() ? "Account created. Email verification is skipped in this development preview. You can sign in now." : "Account created. Check your email to verify your address." }, statusCode: 201);
         });
         routes.MapPost("/login", async (AuthInput body, SignInManager<IdentityUser> signIn) =>
         {

@@ -2,3 +2,4 @@
 - [Sidecar date serialization](sidecar-date-serialization.md) — storage signing expiry must use UTC Z; escaped plus-offset timestamps yield empty HTTP 400 responses.
 - [Playback test codecs](playback-test-codecs.md) — testing Chromium lacks H.264; use VP9 MP4 for positive playback and distinguish codec support from corrupt delivery.
 - [PayGate sandbox documentation](paygate-sandbox-docs.md) — public test presets conflict across official pages; verify product-specific requests rather than trusting a generic example.
+- [Preview email verification](preview-email-verification.md) — user-approved bypass for preview sign-in and profile setup only; published accounts must still verify email.

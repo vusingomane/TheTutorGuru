@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using TutorGuru.Api.Data;
+using TutorGuru.Api.Identity;
 
 namespace TutorGuru.Api;
 
@@ -20,14 +21,15 @@ public static class AccountEndpoints
         });
         app.MapGet("/api/profile", async (HttpContext c, Database db) =>
             Results.Json(await db.One(Tutoring.ProfileSelect + " WHERE id=$1", Tutoring.Id(c)) ?? throw new HttpError(404, "Create your tutoring profile or link your existing account.")));
-        app.MapPut("/api/profile", async (ProfileInput body, HttpContext c, Database db, UserManager<IdentityUser> users) =>
+        app.MapPut("/api/profile", async (ProfileInput body, HttpContext c, Database db, UserManager<IdentityUser> users, IWebHostEnvironment env) =>
         {
             Tutoring.Text(body.FullName, "full name", 2, 200);
             if (!new[] { "parent", "learner", "tutor" }.Contains(body.Role)) throw new HttpError(400, "Choose parent, learner, or tutor.");
             if (body.Role == "learner" && body.Grade is null) throw new HttpError(400, "Choose your school grade.");
             if (body.Grade.HasValue) Tutoring.Grade(body.Grade.Value);
             var user = await users.GetUserAsync(c.User);
-            if (user?.EmailConfirmed != true) throw new HttpError(403, "Verify your email before completing your profile.");
+            if (!EmailVerificationPolicy.CanCompleteProfile(user, env)) throw new HttpError(403, "Verify your email before completing your profile.");
+            if (user is null) throw new HttpError(401, "Please sign in.");
             var existing = await db.One(Tutoring.ProfileSelect + " WHERE id=$1", Tutoring.Id(c));
             if (existing is not null && (string)existing["role"]! != body.Role) throw new HttpError(409, "Your account role cannot be changed after setup.");
             // Email alone never transfers ownership of an existing Clerk profile.

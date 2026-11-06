@@ -37,7 +37,7 @@ builder.Services.AddIdentityCore<IdentityUser>(options =>
 {
     options.User.RequireUniqueEmail = true;
     options.Password.RequiredLength = 10;
-    options.SignIn.RequireConfirmedEmail = true;
+    options.SignIn.RequireConfirmedEmail = EmailVerificationPolicy.IsRequired(builder.Environment);
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
 }).AddUserStore<DapperUserStore>().AddSignInManager().AddDefaultTokenProviders();
