@@ -68,3 +68,4 @@ PAYGATE_PUBLIC_SANDBOX_ACCOUNT = "10011064270"
 
 [userenv.production]
 ADMIN_BOOTSTRAP_EMAIL = "vucy.ngomane@gmail.com"
+ADMIN_BOOTSTRAP_ENABLED = "true"
