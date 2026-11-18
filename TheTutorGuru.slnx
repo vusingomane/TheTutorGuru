@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TutorGuru.Api/TutorGuru.Api.csproj" />
+    <Project Path="src/TutorGuru.Web/TutorGuru.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TutorGuru.AuthPolicyChecks/TutorGuru.AuthPolicyChecks.csproj" />
+    <Project Path="tests/TutorGuru.BillingChecks/BillingChecks.csproj" />
+  </Folder>
+</Solution>
